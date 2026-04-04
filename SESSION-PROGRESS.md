@@ -1,8 +1,8 @@
 # Session Progress
 
-## Current Phase: 1.1 — Shared Base Classes (not started)
+## Current Phase: 1.2 — Value Objects (not started)
 
-Phase 0 is complete. The student is ready to start writing domain code.
+Phase 0 and Phase 1.1 are complete. Student has all shared base classes built.
 
 ## Completed Phases
 
@@ -72,12 +72,29 @@ Phase 0 is complete. The student is ready to start writing domain code.
   - `defineConfig` config file serves both NestJS app and MikroORM CLI
   - NestJS folder convention is flexible — modules wire everything, folder structure is our choice
 
-## What's Next: Phase 1 — Domain Model
+### Phase 1.1 — Shared Base Classes
+- Created 4 base classes in `src/shared/domain/`:
+  - `Entity.ts` — abstract, public readonly id, equals() by id
+  - `ValueObject.ts` — abstract, abstract equals() (each subclass defines own equality)
+  - `DomainEvent.ts` — abstract, readonly occurredOn set to new Date() in constructor
+  - `AggregateRoot.ts` — extends Entity, private domainEvents array, protected addDomainEvent(), public pullDomainEvents() (returns events and clears array)
+- Set up Biome for formatting/linting (replaced ESLint + Prettier)
+  - biome.json at workspace root (study/) with paths pointing to event-ticketing/src/**
+  - VS Code format on save configured
+  - Semicolons disabled (asNeeded)
+- Key lessons learned:
+  - `abstract` = blueprint class, can't instantiate directly
+  - `public readonly` for id — visible but immutable
+  - `private` vs `protected` vs `public` access modifiers
+  - Classes can be used as types in TypeScript (not just as constructors)
+  - `pullDomainEvents()` must clear the array after returning to prevent duplicate publishing
+  - Domain layer imports NOTHING from frameworks — pure TypeScript
 
-Guide the student through building pure TypeScript domain code (no framework imports):
+## What's Next: Phase 1.2 — Value Objects
 
-1. **Phase 1.1** — Shared base classes in `shared/domain/`: Entity, AggregateRoot, ValueObject, DomainEvent
-2. **Phase 1.2** — Value Objects for the Ordering context
+Guide the student through building value objects for the Ordering context:
+
+1. **Phase 1.2** — Value Objects for the Ordering context
 3. **Phase 1.3** — Domain Errors
 4. **Phase 1.4** — Order aggregate root with Order Items
 5. **Phase 1.5** — Repository interfaces (ports)

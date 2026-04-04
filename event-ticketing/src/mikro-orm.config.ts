@@ -1,6 +1,6 @@
-import 'dotenv/config';
-import { defineConfig } from '@mikro-orm/postgresql';
-import { Migrator } from '@mikro-orm/migrations';
+import 'dotenv/config'
+import { Migrator } from '@mikro-orm/migrations'
+import { defineConfig } from '@mikro-orm/postgresql'
 
 export default defineConfig({
   host: process.env.DATABASE_HOST,
@@ -15,4 +15,4 @@ export default defineConfig({
   },
   extensions: [Migrator],
   debug: true,
-});
+})

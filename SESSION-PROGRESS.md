@@ -63,7 +63,7 @@ Phase 0 is complete. The student is ready to start writing domain code.
 - `.env` with DATABASE_HOST, DATABASE_PORT, DATABASE_NAME, DATABASE_USER, DATABASE_PASSWORD
 - `mikro-orm.config.ts` with `defineConfig` + `import 'dotenv/config'` (single config for both NestJS and CLI)
 - `app.module.ts` wired with `ConfigModule.forRoot({ isGlobal: true })` and `MikroOrmModule.forRoot(mikroOrmConfig)`
-- Folder structure created per TECHNICAL.md (ordering context with domain/application/infrastructure layers + shared/domain)
+- Folder structure created: only domain layer folders for now (ordering/domain/model, ports, events, errors + shared/domain). Application and infrastructure folders removed — will create when needed (no empty folders)
 - `ordering.module.ts` created (empty, to be wired later)
 - Key lessons learned:
   - Always use production tools (PostgreSQL + Docker, not SQLite)
@@ -105,3 +105,4 @@ Guide the student through building pure TypeScript domain code (no framework imp
 - `DOMAIN.md` — All project-specific decisions (glossary, contexts, aggregates, DB schema, API design)
 - `how-to-map-requirements/` — 5 reusable thinking guides (01 through 05)
 - `event-ticketing/` — NestJS project with MikroORM, PostgreSQL via Docker
+- `.claude-memories/` — Persistent memories that travel with the repo (learning profile, feedback)

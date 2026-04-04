@@ -7,7 +7,7 @@ This project follows **DDD + Hexagonal + Clean Architecture** with **NestJS**, *
 @TECHNICAL.md
 @TEACH-ME.md
 
-- **TECHNICAL.md** — The architecture bible. Contains all rules for domain/application/infrastructure layers, folder structure, base classes, code examples, patterns to follow, anti-patterns to avoid, and testing strategy.
+- **TECHNICAL.md** — A starting reference for architecture patterns. **NOT law** — use it as a base but always apply real industry best practices. If TECHNICAL.md says one thing but industry practice says another, go with industry practice and explain why.
 
 - **TEACH-ME.md** — The teaching methodology. Defines HOW to teach: the learning loop, phases 0-4 progression, challenge difficulty curve, and mentoring rules.
 
@@ -42,3 +42,14 @@ The `how-to-map-requirements/` folder contains reusable thinking guides that tea
 - **05-API-DESIGN-GUIDE.md** — How to design REST APIs: listing user actions, choosing HTTP methods (POST for actions, PATCH for field updates), URL patterns (nouns not verbs), request bodies (minimum data), responses (full resource with human-readable data), status codes (400 vs 409), error format, and pagination.
 
 **Important:** When creating new guides for the student, always place them in this folder with a numbered prefix to indicate the chronological order of the steps. These guides must be system-agnostic — they teach the thinking process, not this specific project's answers.
+
+## Memories
+
+The `.claude-memories/` folder contains persistent memories that MUST be read at the start of every session. These travel with the repo via git.
+
+- **MEMORY.md** — Index of all memory files
+- **user_learning_profile.md** — How this student learns, preferences, session continuity needs
+- **feedback_production_grade.md** — Always use production tools, never toy setups
+- **feedback_technical_is_base.md** — TECHNICAL.md is a base, not law — apply real industry practices
+
+When new memories are created during a session, save them in BOTH `.claude-memories/` (travels with repo) and `~/.claude/projects/.../memory/` (local Claude memory system).

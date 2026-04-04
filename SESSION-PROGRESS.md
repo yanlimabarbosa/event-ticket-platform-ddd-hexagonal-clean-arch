@@ -1,8 +1,8 @@
 # Session Progress
 
-## Current Phase: 0.7 — Project Setup (not started)
+## Current Phase: 1.1 — Shared Base Classes (not started)
 
-The student has completed Phases 0.1 through 0.6 (all domain discovery, no code yet).
+Phase 0 is complete. The student is ready to start writing domain code.
 
 ## Completed Phases
 
@@ -54,27 +54,48 @@ The student has completed Phases 0.1 through 0.6 (all domain discovery, no code 
   - APIs return data, frontends build messages
   - Request bodies contain minimum data — server knows prices, user ID (from token), timestamps
 
-## What's Next: Phase 0.7
+### Phase 0.7 — Project Setup
+- Scaffolded NestJS with `npx @nestjs/cli new event-ticketing --package-manager pnpm --strict`
+- Changed tsconfig to `"strict": true` (full strict, not partial — important for DDD to catch uninitialized fields)
+- Installed MikroORM: `@mikro-orm/core`, `@mikro-orm/nestjs`, `@mikro-orm/postgresql`, `@mikro-orm/migrations`, `@mikro-orm/cli`
+- Installed `@nestjs/config` for environment variable management
+- PostgreSQL 16 via Docker Compose (container: `event_ticketing_db`, port 5432)
+- `.env` with DATABASE_HOST, DATABASE_PORT, DATABASE_NAME, DATABASE_USER, DATABASE_PASSWORD
+- `mikro-orm.config.ts` with `defineConfig` + `import 'dotenv/config'` (single config for both NestJS and CLI)
+- `app.module.ts` wired with `ConfigModule.forRoot({ isGlobal: true })` and `MikroOrmModule.forRoot(mikroOrmConfig)`
+- Folder structure created per TECHNICAL.md (ordering context with domain/application/infrastructure layers + shared/domain)
+- `ordering.module.ts` created (empty, to be wired later)
+- Key lessons learned:
+  - Always use production tools (PostgreSQL + Docker, not SQLite)
+  - Docker volumes: named volume on host mapped to container path, not copying — same folder accessed from two paths
+  - `forRoot()` = global setup in AppModule, `forFeature()` = per-module entity registration
+  - `defineConfig` config file serves both NestJS app and MikroORM CLI
+  - NestJS folder convention is flexible — modules wire everything, folder structure is our choice
 
-Guide the student through:
-1. Scaffolding NestJS project: `npx @nestjs/cli new event-ticketing --package-manager npm --strict`
-2. Installing MikroORM + PostgreSQL/SQLite driver
-3. Setting up database connection
-4. Creating the folder structure per TECHNICAL.md
-5. Setting up migrations
-6. Configuring Jest for testing
+## What's Next: Phase 1 — Domain Model
 
-After 0.7, we move to Phase 1 — Domain Model (pure TypeScript, no framework).
+Guide the student through building pure TypeScript domain code (no framework imports):
+
+1. **Phase 1.1** — Shared base classes in `shared/domain/`: Entity, AggregateRoot, ValueObject, DomainEvent
+2. **Phase 1.2** — Value Objects for the Ordering context
+3. **Phase 1.3** — Domain Errors
+4. **Phase 1.4** — Order aggregate root with Order Items
+5. **Phase 1.5** — Repository interfaces (ports)
+6. **Phase 1.6** — Domain service interfaces (ports)
+7. **Phase 1.7** — Domain unit tests
 
 ## Student Profile
 
 - Learning DDD, Hexagonal, and Clean Architecture for the first time
-- Not deeply familiar with database concepts (indexes, FK relationships were new)
-- Needs visual examples (table diagrams) to understand data relationships
+- Not deeply familiar with database concepts (indexes, FK relationships, Docker volumes were new)
+- Needs visual examples (table diagrams, ASCII art) to understand data relationships
 - Asks good clarifying questions — prefers to understand WHY before proceeding
 - Sometimes needs multiple hints before attempting challenges
 - Gets confused between similar concepts (Order Items vs Tickets, Event vs Venue)
 - Responds well to direct corrections with consequences explained
+- Wants production-grade tools always — no toy setups (SQLite → PostgreSQL, etc.)
+- Pushes back when something feels wrong — good instinct, respect it
+- Curious about how things work under the hood (Docker volumes, token context, config loading)
 
 ## Project Files
 
@@ -83,3 +104,4 @@ After 0.7, we move to Phase 1 — Domain Model (pure TypeScript, no framework).
 - `TEACH-ME.md` — Teaching methodology (pre-existing, not modified)
 - `DOMAIN.md` — All project-specific decisions (glossary, contexts, aggregates, DB schema, API design)
 - `how-to-map-requirements/` — 5 reusable thinking guides (01 through 05)
+- `event-ticketing/` — NestJS project with MikroORM, PostgreSQL via Docker

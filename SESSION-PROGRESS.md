@@ -125,11 +125,23 @@ Phases 0, 1.1, 1.2, and 1.3 are complete. Student has shared base classes, value
   - `this.constructor.name` returns the class name as a string — built-in JS feature
   - Error `.name` and `.message` are different: name = error type, message = what went wrong
 
-## What's Next: Phase 1.4 — Order Aggregate
-4. **Phase 1.4** — Order aggregate root with Order Items
+## What's Next: Phase 1.4 — Order Aggregate (in progress)
+4. **Phase 1.4** — Order aggregate root with Order Items (in progress — Order and OrderItem built, domain events next)
 5. **Phase 1.5** — Repository interfaces (ports)
 6. **Phase 1.6** — Domain service interfaces (ports)
 7. **Phase 1.7** — Domain unit tests
+
+## Architectural Decisions
+
+### Events + CQRS
+- Build Phase 2 **without CQRS** — simple use case services + EventEmitter2 for domain events
+- After Phase 4, optionally refactor to CQRS (`@nestjs/cqrs` with CommandBus/QueryBus/EventBus) so the student learns both approaches
+- Domain events are independent of CQRS — they work with or without it
+- In-memory EventBus is production-grade for a monolith — message brokers (Kafka, RabbitMQ) are only needed for microservices
+- If bounded contexts are later split into microservices, only the infrastructure adapter changes (EventBus → Kafka), domain code stays the same
+
+### Future exploration (after Phase 4)
+- Explore **message queues** (RabbitMQ or Kafka) — swap in-memory EventBus for a real broker to learn infrastructure-level event transport
 
 ## Student Profile
 

@@ -1,8 +1,8 @@
 # Session Progress
 
-## Current Phase: 1.3 — Domain Errors (not started)
+## Current Phase: 1.4 — Order Aggregate (not started)
 
-Phases 0, 1.1, and 1.2 are complete. Student has shared base classes and all value objects built.
+Phases 0, 1.1, 1.2, and 1.3 are complete. Student has shared base classes, value objects, and domain errors built.
 
 ## Completed Phases
 
@@ -109,9 +109,23 @@ Phases 0, 1.1, and 1.2 are complete. Student has shared base classes and all val
   - Terminal states = no transitions allowed (expired, cancelled)
   - Always add explicit access modifiers (public/private/protected) for readability
 
-## What's Next: Phase 1.3 — Domain Errors
+### Phase 1.3 — Domain Errors
+- Created `DomainError` base class in `src/shared/domain/DomainError.ts` — extends Error, auto-sets `this.name` to class name via `this.constructor.name`
+- Created 3 domain errors in `src/ordering/domain/errors/`:
+  - `InvalidMoney.ts` — takes invalid value, produces descriptive message
+  - `InvalidQuantity.ts` — same pattern as InvalidMoney
+  - `InvalidOrderTransition.ts` — takes current and attempted status, type-safe with exported `OrderStatusType`
+- Updated value objects (Money, Quantity, OrderStatus) to throw domain errors instead of generic `Error`
+- Exported `OrderStatusType` from OrderStatus.ts for type safety in error class
+- Key lessons learned:
+  - Custom domain errors are catchable by type (`instanceof`) — generic `Error` is not
+  - `DomainError` base class lets infrastructure catch ALL business errors with one `instanceof DomainError` check
+  - One error class per business situation, not per validation line (InvalidMoney covers both "not integer" and "negative")
+  - `throw` needs `new` — without it you throw the class itself, not an instance
+  - `this.constructor.name` returns the class name as a string — built-in JS feature
+  - Error `.name` and `.message` are different: name = error type, message = what went wrong
 
-1. **Phase 1.3** — Domain Errors
+## What's Next: Phase 1.4 — Order Aggregate
 4. **Phase 1.4** — Order aggregate root with Order Items
 5. **Phase 1.5** — Repository interfaces (ports)
 6. **Phase 1.6** — Domain service interfaces (ports)

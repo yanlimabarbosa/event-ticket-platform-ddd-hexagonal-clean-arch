@@ -1,4 +1,5 @@
 import { ValueObject } from 'src/shared/domain/ValueObject'
+import { InvalidQuantity } from '../errors/InvalidQuantity'
 
 export class Quantity extends ValueObject {
   private readonly value: number
@@ -7,11 +8,11 @@ export class Quantity extends ValueObject {
     super()
 
     if (!Number.isInteger(value)) {
-      throw new Error('Quantity must be a whole number')
+      throw new InvalidQuantity(value)
     }
 
     if (value < 1) {
-      throw new Error('Quantity must be at least 1')
+      throw new InvalidQuantity(value)
     }
 
     this.value = value

@@ -1,11 +1,12 @@
 import { ValueObject } from 'src/shared/domain/ValueObject'
+import { InvalidOrderTransition } from '../errors/InvalidOrderTransition'
 
-type Status = 'reserved' | 'paid' | 'expired' | 'cancelled'
+export type OrderStatusType = 'reserved' | 'paid' | 'expired' | 'cancelled'
 
 export class OrderStatus extends ValueObject {
-  private readonly value: Status
+  private readonly value: OrderStatusType
 
-  private constructor(value: Status) {
+  private constructor(value: OrderStatusType) {
     super()
     this.value = value
   }
@@ -33,7 +34,7 @@ export class OrderStatus extends ValueObject {
 
   public toPaid(): OrderStatus {
     if (this.value !== 'reserved') {
-      throw new Error('Order must be reserved to be paid')
+      throw new InvalidOrderTransition(this.value, 'paid')
     }
 
     return OrderStatus.paid()
@@ -41,7 +42,7 @@ export class OrderStatus extends ValueObject {
 
   public toExpired(): OrderStatus {
     if (this.value !== 'reserved') {
-      throw new Error('Order must be reserved to be expired')
+      throw new InvalidOrderTransition(this.value, 'expired')
     }
 
     return OrderStatus.expired()
@@ -49,13 +50,13 @@ export class OrderStatus extends ValueObject {
 
   public toCancelled(): OrderStatus {
     if (this.value !== 'paid') {
-      throw new Error('Order must be paid to be cancelled')
+      throw new InvalidOrderTransition(this.value, 'cancelled')
     }
 
     return OrderStatus.cancelled()
   }
 
-  public getValue(): Status {
+  public getValue(): OrderStatusType {
     return this.value
   }
 }

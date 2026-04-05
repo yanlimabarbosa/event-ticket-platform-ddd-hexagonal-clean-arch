@@ -1,4 +1,5 @@
 import { ValueObject } from 'src/shared/domain/ValueObject'
+import { InvalidMoney } from '../errors/InvalidMoney'
 
 export class Money extends ValueObject {
   private readonly value: number
@@ -7,11 +8,11 @@ export class Money extends ValueObject {
     super()
 
     if (!Number.isInteger(value)) {
-      throw new Error('Money amount must be a whole number (cents)')
+      throw new InvalidMoney(value)
     }
 
     if (value < 0) {
-      throw new Error('Money amount cannot be negative')
+      throw new InvalidMoney(value)
     }
 
     this.value = value

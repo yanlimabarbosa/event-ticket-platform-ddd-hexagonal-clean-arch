@@ -1,8 +1,8 @@
 # Session Progress
 
-## Current Phase: 1.2 — Value Objects (not started)
+## Current Phase: 1.3 — Domain Errors (not started)
 
-Phase 0 and Phase 1.1 are complete. Student has all shared base classes built.
+Phases 0, 1.1, and 1.2 are complete. Student has shared base classes and all value objects built.
 
 ## Completed Phases
 
@@ -90,12 +90,28 @@ Phase 0 and Phase 1.1 are complete. Student has all shared base classes built.
   - `pullDomainEvents()` must clear the array after returning to prevent duplicate publishing
   - Domain layer imports NOTHING from frameworks — pure TypeScript
 
-## What's Next: Phase 1.2 — Value Objects
+### Phase 1.2 — Value Objects
+- Created 3 value objects in `src/ordering/domain/model/`:
+  - `Money.ts` — stores amount in cents (integer), non-negative, private constructor + static create()
+  - `Quantity.ts` — positive integer, same pattern as Money
+  - `OrderStatus.ts` — state machine value object with transition methods (toPaid, toExpired, toCancelled), static factories per state (reserved, paid, expired, cancelled), guards invalid transitions
+- Updated `ValueObject.ts` base class — removed generic approach, kept simple `abstract equals(other: unknown)` with instanceof check in subclasses
+- Key lessons learned:
+  - Value objects are immutable — transitions return NEW objects, never mutate
+  - Private constructor + static factory = one controlled entry point
+  - Money stored as integer cents avoids floating-point issues (industry standard: Stripe, PayPal)
+  - `Number.isInteger()` to enforce no decimals
+  - `super()` must be called in child constructors (TS and Java both enforce this)
+  - Self-referential generics (`ValueObject<T extends ValueObject<T>>`) are a Java/C# pattern — in TS the simpler `equals(other: unknown)` with instanceof is more common
+  - Static methods can't access instance fields (`this.value` doesn't exist on the class)
+  - `instanceof` narrows types in TS — after the check, TS knows the type
+  - OrderStatus static factories needed for: initial creation (reserved), DB reconstruction (any state), testing
+  - Terminal states = no transitions allowed (expired, cancelled)
+  - Always add explicit access modifiers (public/private/protected) for readability
 
-Guide the student through building value objects for the Ordering context:
+## What's Next: Phase 1.3 — Domain Errors
 
-1. **Phase 1.2** — Value Objects for the Ordering context
-3. **Phase 1.3** — Domain Errors
+1. **Phase 1.3** — Domain Errors
 4. **Phase 1.4** — Order aggregate root with Order Items
 5. **Phase 1.5** — Repository interfaces (ports)
 6. **Phase 1.6** — Domain service interfaces (ports)

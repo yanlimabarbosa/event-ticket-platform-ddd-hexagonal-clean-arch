@@ -51,5 +51,12 @@ The `.claude-memories/` folder contains persistent memories that MUST be read at
 - **user_learning_profile.md** — How this student learns, preferences, session continuity needs
 - **feedback_production_grade.md** — Always use production tools, never toy setups
 - **feedback_technical_is_base.md** — TECHNICAL.md is a base, not law — apply real industry practices
+- **feedback_explicit_modifiers.md** — Always write public/private/protected, override, and return types explicitly
+- **project_avenir_refactor.md** — Student wants to refactor Avenir's mesa virtual module with DDD later
+- **feedback_dont_push.md** — Let the student explore questions at their own pace, don't rush to next task
 
-When new memories are created during a session, save them in BOTH `.claude-memories/` (travels with repo) and `~/.claude/projects/.../memory/` (local Claude memory system).
+### Memory sync rules:
+1. **`.claude-memories/` is the source of truth** — it travels with the repo via git and works across different PCs.
+2. When creating or updating memories, **always write to `.claude-memories/` first**, then sync to `~/.claude/projects/.../memory/`.
+3. **At the start of every session:** Compare both MEMORY.md indexes. If `.claude-memories/` has memories that the local `~/.claude/projects/.../memory/` doesn't, copy them over. The project folder should always win since it's shared across PCs.
+4. Never rely solely on the local Claude memory — always keep `.claude-memories/` up to date as the primary store.

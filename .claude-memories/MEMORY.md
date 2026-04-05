@@ -2,3 +2,5 @@
 - [Production grade](feedback_production_grade.md) — Always use production tools (PostgreSQL, Docker, etc.), never toy setups
 - [TECHNICAL.md is a base](feedback_technical_is_base.md) — Don't follow it strictly, apply real industry best practices instead
 - [Explicit modifiers](feedback_explicit_modifiers.md) — Always write public/private/protected, override, and return types explicitly
+- [Avenir refactor](project_avenir_refactor.md) — Student wants to refactor Avenir's mesa virtual module with DDD later
+- [Don't push](feedback_dont_push.md) — Let the student explore questions at their own pace, don't rush to next task

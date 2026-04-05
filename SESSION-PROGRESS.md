@@ -1,8 +1,8 @@
 # Session Progress
 
-## Current Phase: 1.4 — Order Aggregate (not started)
+## Current Phase: 1.5 — Repository Interfaces (not started)
 
-Phases 0, 1.1, 1.2, and 1.3 are complete. Student has shared base classes, value objects, and domain errors built.
+Phases 0, 1.1, 1.2, 1.3, and 1.4 are complete. Student has the full domain model for the Ordering context.
 
 ## Completed Phases
 
@@ -125,8 +125,41 @@ Phases 0, 1.1, 1.2, and 1.3 are complete. Student has shared base classes, value
   - `this.constructor.name` returns the class name as a string — built-in JS feature
   - Error `.name` and `.message` are different: name = error type, message = what went wrong
 
-## What's Next: Phase 1.4 — Order Aggregate (in progress)
-4. **Phase 1.4** — Order aggregate root with Order Items (in progress — Order and OrderItem built, domain events next)
+### Phase 1.4 — Order Aggregate
+- Created **OrderItem** child entity in `src/ordering/domain/model/OrderItem.ts`:
+  - Extends Entity, immutable after creation, receives value objects (Quantity, Money) directly
+  - Getters for all fields, `getTotal()` returns Money (quantity × unitPrice)
+- Created **Order** aggregate root in `src/ordering/domain/model/Order.ts`:
+  - Extends AggregateRoot, 9 private fields, constructor receives ALL fields (for DB reconstruction)
+  - `static create()` factory sets defaults (status=reserved, createdAt=now, expiresAt=now+15min)
+  - Behavior methods: `pay()`, `expire()`, `cancel(reason)` — transition status via OrderStatus value object
+  - `getTotal()` calculates from items using reduce
+  - `getItems()` returns a copy (`[...this.items]`) to prevent external mutation
+  - Invariant #1 enforced: throws EmptyOrderItem if items array is empty
+  - All 4 methods record domain events via `this.addDomainEvent()`
+- Created **EmptyOrderItem** domain error in `src/ordering/domain/errors/`
+- Created **4 domain events** in `src/ordering/domain/events/`:
+  - `OrderCreated` (orderId, expiresAt) — recorded in create()
+  - `OrderPaid` (orderId, attendeeId, eventId, items as plain data) — recorded in pay()
+  - `OrderExpired` (orderId, attendeeId) — recorded in expire()
+  - `OrderCancelled` (orderId, attendeeId, reason) — recorded in cancel()
+  - Events use `public readonly` fields (no getters needed — immutable data carriers)
+  - Events carry self-contained data for future microservice compatibility
+- Key lessons learned:
+  - Constructor = dumb (receives everything, just assigns). Factory = smart (computes defaults)
+  - Constructor is for DB mapper reconstruction, factory is for new creation
+  - Value objects are received, not created inside entities (avoid double validation)
+  - Arrays are passed by reference — return copies to protect aggregate internals
+  - `readonly` only prevents reassignment — mutable fields (status, paidAt) can't be readonly
+  - Domain events are recorded inside aggregate, published externally by use case (Phase 2)
+  - Events carry plain data, not domain objects (map OrderItem[] to simple {ticketTypeId, quantity})
+  - Anemic Domain Model (anti-pattern) = classes with only data, no behavior — recognized in Acutis project
+  - DDD vs Good OOP: main difference is bounded contexts + domain events + ubiquitous language as law
+  - Not every project needs DDD — simple CRUD is fine without it, DDD adds overhead
+  - CQRS is separate from events — events decouple contexts, CQRS organizes reads/writes
+
+## What's Next
+4. ~~Phase 1.4~~ ✅
 5. **Phase 1.5** — Repository interfaces (ports)
 6. **Phase 1.6** — Domain service interfaces (ports)
 7. **Phase 1.7** — Domain unit tests
@@ -155,6 +188,9 @@ Phases 0, 1.1, 1.2, and 1.3 are complete. Student has shared base classes, value
 - Wants production-grade tools always — no toy setups (SQLite → PostgreSQL, etc.)
 - Pushes back when something feels wrong — good instinct, respect it
 - Curious about how things work under the hood (Docker volumes, token context, config loading)
+- Connects learning to real job projects (compared Acutis and Avenir to patterns being learned) — let these tangents happen, they deepen understanding
+- Wants to learn common/foundational patterns before advanced ones (prefers use case services before CQRS)
+- Don't push to next step — let the student explore questions at their own pace
 
 ## Project Files
 

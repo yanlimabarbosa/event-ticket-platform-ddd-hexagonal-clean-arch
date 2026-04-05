@@ -1,3 +1,4 @@
 - [Learning profile](user_learning_profile.md) — Student's learning style, preferences, and session continuity needs
 - [Production grade](feedback_production_grade.md) — Always use production tools (PostgreSQL, Docker, etc.), never toy setups
 - [TECHNICAL.md is a base](feedback_technical_is_base.md) — Don't follow it strictly, apply real industry best practices instead
+- [Explicit modifiers](feedback_explicit_modifiers.md) — Always write public/private/protected, override, and return types explicitly

@@ -22,7 +22,7 @@ export class Quantity extends ValueObject {
     return new Quantity(quantity)
   }
 
-  public equals(other: Quantity): boolean {
+  public override equals(other: Quantity): boolean {
     if (!(other instanceof Quantity)) return false
     return this.value === other.value
   }

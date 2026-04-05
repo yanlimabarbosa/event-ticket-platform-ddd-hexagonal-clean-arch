@@ -27,7 +27,7 @@ export class OrderStatus extends ValueObject {
     return new OrderStatus('cancelled')
   }
 
-  public equals(other: OrderStatus): boolean {
+  public override equals(other: OrderStatus): boolean {
     if (!(other instanceof OrderStatus)) return false
     return this.value === other.value
   }

@@ -160,9 +160,10 @@ Phases 0, 1.1, 1.2, 1.3, and 1.4 are complete. Student has the full domain model
 
 ## What's Next
 4. ~~Phase 1.4~~ ✅
-5. **Phase 1.5** — Repository interfaces (ports)
-6. **Phase 1.6** — Domain service interfaces (ports)
-7. **Phase 1.7** — Domain unit tests
+5. ~~Phase 1.5~~ ✅ — Repository interfaces (ports)
+6. ~~Phase 1.6~~ ✅ — Domain service interfaces (ports)
+7. **Phase 1.7** — Domain unit tests (deferred — will write after routes are working)
+8. **Phase 2** — Application layer (use cases, starting with Create Order)
 
 ## Architectural Decisions
 

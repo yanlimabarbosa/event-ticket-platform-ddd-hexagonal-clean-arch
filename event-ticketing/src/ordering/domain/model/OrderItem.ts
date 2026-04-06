@@ -3,15 +3,13 @@ import { Money } from './Money'
 import type { Quantity } from './Quantity'
 
 export class OrderItem extends Entity {
-  private readonly ticketTypeId: string
-  private readonly quantity: Quantity
-  private readonly unitPrice: Money
-
-  public constructor(id: string, ticketTypeId: string, quantity: Quantity, unitPrice: Money) {
+  public constructor(
+    id: string,
+    private readonly ticketTypeId: string,
+    private readonly quantity: Quantity,
+    private readonly unitPrice: Money,
+  ) {
     super(id)
-    this.ticketTypeId = ticketTypeId
-    this.quantity = quantity
-    this.unitPrice = unitPrice
   }
 
   public getTicketTypeId(): string {

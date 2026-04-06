@@ -4,11 +4,8 @@ import { InvalidOrderTransition } from '../errors/InvalidOrderTransition'
 export type OrderStatusType = 'reserved' | 'paid' | 'expired' | 'cancelled'
 
 export class OrderStatus extends ValueObject {
-  private readonly value: OrderStatusType
-
-  private constructor(value: OrderStatusType) {
+  private constructor(private readonly value: OrderStatusType) {
     super()
-    this.value = value
   }
 
   public static reserved(): OrderStatus {

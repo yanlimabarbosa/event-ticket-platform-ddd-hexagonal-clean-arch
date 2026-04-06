@@ -1,46 +1,27 @@
 import { AggregateRoot } from 'src/shared/domain/AggregateRoot'
 import { EmptyOrderItem } from '../errors/EmptyOrderItem'
+import { OrderCancelled } from '../events/OrderCancelled'
+import { OrderCreated } from '../events/OrderCreated'
+import { OrderExpired } from '../events/OrderExpired'
+import { OrderPaid } from '../events/OrderPaid'
 import { Money } from './Money'
 import type { OrderItem } from './OrderItem'
 import { OrderStatus } from './OrderStatus'
-import { OrderPaid } from '../events/OrderPaid'
-import { OrderCreated } from '../events/OrderCreated'
-import { OrderExpired } from '../events/OrderExpired'
-import { OrderCancelled } from '../events/OrderCancelled'
 
 export class Order extends AggregateRoot {
-  private readonly eventId: string
-  private readonly attendeeId: string
-  private readonly items: OrderItem[]
-  private status: OrderStatus
-  private readonly createdAt: Date
-  private readonly expiresAt: Date
-  private paidAt: Date | null
-  private cancelledAt: Date | null
-  private cancelReason: string | null
-
   public constructor(
     id: string,
-    eventId: string,
-    attendeeId: string,
-    items: OrderItem[],
-    status: OrderStatus,
-    createdAt: Date,
-    expiresAt: Date,
-    paidAt: Date | null,
-    cancelledAt: Date | null,
-    cancelReason: string | null,
+    private readonly eventId: string,
+    private readonly attendeeId: string,
+    private readonly items: OrderItem[],
+    private status: OrderStatus,
+    private readonly createdAt: Date,
+    private readonly expiresAt: Date,
+    private paidAt: Date | null,
+    private cancelledAt: Date | null,
+    private cancelReason: string | null,
   ) {
     super(id)
-    this.eventId = eventId
-    this.attendeeId = attendeeId
-    this.items = items
-    this.status = status
-    this.createdAt = createdAt
-    this.expiresAt = expiresAt
-    this.paidAt = paidAt
-    this.cancelledAt = cancelledAt
-    this.cancelReason = cancelReason
   }
 
   public static create(id: string, eventId: string, attendeeId: string, items: OrderItem[]): Order {

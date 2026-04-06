@@ -1,8 +1,8 @@
 # Session Progress
 
-## Current Phase: 1.5 — Repository Interfaces (not started)
+## Current Phase: 2.1 — Use Cases (in progress — CreateOrderUseCase done)
 
-Phases 0, 1.1, 1.2, 1.3, and 1.4 are complete. Student has the full domain model for the Ordering context.
+Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Domain layer is fully built. Application layer started.
 
 ## Completed Phases
 
@@ -158,12 +158,49 @@ Phases 0, 1.1, 1.2, 1.3, and 1.4 are complete. Student has the full domain model
   - Not every project needs DDD — simple CRUD is fine without it, DDD adds overhead
   - CQRS is separate from events — events decouple contexts, CQRS organizes reads/writes
 
+### Phase 1.5 — Repository Interfaces (Ports)
+- Created `OrderRepository` interface in `src/ordering/domain/ports/OrderRepository.ts`
+  - 3 methods: `save(order)`, `findById(id)`, `findByAttendeeId(attendeeId)`
+  - All async (Promise), findById returns `Order | null`
+  - One repository per aggregate root — no OrderItemRepository
+- Key lessons: ports define WHAT the domain needs, not HOW. Zero framework imports.
+
+### Phase 1.6 — Domain Service Interfaces (Ports)
+- Created `EventAvailabilityChecker` in `src/ordering/domain/ports/`
+  - `isEventOpenForSales(eventId)` and `hasEnoughTickets(ticketTypeId, quantity)`
+  - Enforces invariants #2 and #6 which need external data
+- Created `PaymentGateway` in `src/ordering/domain/ports/`
+  - `charge(orderId, amount, paymentToken)`
+- Chose Option A (port in domain) over Option B (direct check in use case) for microservice-readiness
+- Key lessons: domain defines what it needs to ask external services, infrastructure implements how
+
+### Phase 2.1 — CreateOrderUseCase (Application Layer)
+- Created `CreateOrderUseCase` in `src/ordering/application/CreateOrderUseCase.ts`
+  - @Injectable, receives OrderRepository and EventAvailabilityChecker via DI
+  - execute() receives raw data (eventId, attendeeId, items as plain objects)
+  - Orchestrates: check availability → create domain objects → Order.create() → save → return
+  - Converts raw input to value objects (Money, Quantity) and entities (OrderItem) — use case is the translator
+- Created 2 new domain errors: `EventNotAvailable`, `InsufficientTickets`
+- Key lessons learned:
+  - Use case is THIN — orchestrates but doesn't contain business logic
+  - Constructor = dependencies (services, repos via DI). execute() = per-request data
+  - Domain objects (Order, Money) are created with `new`/`.create()`, not injected
+  - Services (repos, gateways) are injected — they change between production/tests
+  - Missing `await` on Promise is a dangerous silent bug — Biome `noFloatingPromises` catches it
+  - Application layer CAN use NestJS decorators — only domain layer is pure TS
+
+### Tooling updates
+- Added Biome nursery rules: `noFloatingPromises` (error), `useExplicitType` (error)
+- Fixed VS Code import sorting on save: added `source.fixAll.biome` to codeActionsOnSave
+
 ## What's Next
 4. ~~Phase 1.4~~ ✅
-5. ~~Phase 1.5~~ ✅ — Repository interfaces (ports)
-6. ~~Phase 1.6~~ ✅ — Domain service interfaces (ports)
+5. ~~Phase 1.5~~ ✅
+6. ~~Phase 1.6~~ ✅
 7. **Phase 1.7** — Domain unit tests (deferred — will write after routes are working)
-8. **Phase 2** — Application layer (use cases, starting with Create Order)
+8. ~~Phase 2.1~~ ✅ — CreateOrderUseCase
+9. **Phase 2 continued** — PayOrderUseCase, CancelOrderUseCase, ExpireOrderUseCase
+10. **Phase 3** — Infrastructure layer (MikroORM entities, repository implementations, controllers)
 
 ## Architectural Decisions
 
@@ -192,6 +229,9 @@ Phases 0, 1.1, 1.2, 1.3, and 1.4 are complete. Student has the full domain model
 - Connects learning to real job projects (compared Acutis and Avenir to patterns being learned) — let these tangents happen, they deepen understanding
 - Wants to learn common/foundational patterns before advanced ones (prefers use case services before CQRS)
 - Don't push to next step — let the student explore questions at their own pace
+- Had "aha moment" about OOP — understood why anemic models make OOP feel pointless, and why rich models justify classes
+- Prefers to see the full flow working before writing tests (practical learner)
+- Common mistakes: missing `await`, typos in method names, forgetting to assign return values of immutable operations
 
 ## Project Files
 

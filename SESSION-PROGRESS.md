@@ -1,8 +1,8 @@
 # Session Progress
 
-## Current Phase: 2.1 — Use Cases (in progress — CreateOrderUseCase done)
+## Current Phase: 2.1 — Use Cases (in progress — CreateOrder, PayOrder, CancelOrder done. ExpireOrder next)
 
-Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Domain layer is fully built. Application layer started.
+Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Domain layer is fully built. Application layer in progress.
 
 ## Completed Phases
 
@@ -188,6 +188,22 @@ Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Doma
   - Services (repos, gateways) are injected — they change between production/tests
   - Missing `await` on Promise is a dangerous silent bug — Biome `noFloatingPromises` catches it
   - Application layer CAN use NestJS decorators — only domain layer is pure TS
+  - Use cases belong in application layer, not domain — they orchestrate but don't contain rules
+  - Three layers of validation: DTO (input format) → Use case (external preconditions) → Domain (business rules)
+  - "Open for sales" rule belongs to Event Management domain; Ordering just asks via port
+
+### Phase 2.1 continued — PayOrderUseCase and CancelOrderUseCase
+- Created `PayOrderUseCase` in `src/ordering/application/PayOrderUseCase.ts`
+  - Uses PaymentGateway port to charge, then order.pay(), then save
+  - Handles payment failure with PaymentFailed domain error
+  - Created `PaymentMethod` type (`'credit_card' | 'pix' | 'boleto'`) in PaymentGateway port
+- Created `CancelOrderUseCase` in `src/ordering/application/CancelOrderUseCase.ts`
+  - Simplest use case: find → cancel(reason) → save
+- Created `PaymentFailed` domain error
+- Refactored all classes to use **parameter properties** (TS feature) — cut ~40 lines of boilerplate
+  - Works on: Entity, Order, OrderItem, OrderStatus, all events, all use cases
+  - Doesn't work on: Money, Quantity (validation runs before assignment)
+- Fixed all remaining Biome errors (explicit return types on AggregateRoot, Entity, main.ts)
 
 ### Tooling updates
 - Added Biome nursery rules: `noFloatingPromises` (error), `useExplicitType` (error)
@@ -198,8 +214,8 @@ Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Doma
 5. ~~Phase 1.5~~ ✅
 6. ~~Phase 1.6~~ ✅
 7. **Phase 1.7** — Domain unit tests (deferred — will write after routes are working)
-8. ~~Phase 2.1~~ ✅ — CreateOrderUseCase
-9. **Phase 2 continued** — PayOrderUseCase, CancelOrderUseCase, ExpireOrderUseCase
+8. ~~Phase 2.1~~ ✅ — CreateOrderUseCase, PayOrderUseCase, CancelOrderUseCase
+9. **Phase 2 continued** — ExpireOrderUseCase, then Phase 3
 10. **Phase 3** — Infrastructure layer (MikroORM entities, repository implementations, controllers)
 
 ## Architectural Decisions

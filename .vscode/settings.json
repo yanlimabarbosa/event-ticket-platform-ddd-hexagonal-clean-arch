@@ -1,4 +1,5 @@
 {
+	"biome.lspBin": "./event-ticketing/node_modules/@biomejs/biome/bin/biome",
 	"editor.defaultFormatter": "biomejs.biome",
 	"editor.formatOnSave": true,
 	"editor.codeActionsOnSave": {

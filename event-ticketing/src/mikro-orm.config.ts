@@ -8,8 +8,8 @@ export default defineConfig({
   dbName: process.env.DATABASE_NAME,
   user: process.env.DATABASE_USER,
   password: process.env.DATABASE_PASSWORD,
-  entities: ['dist/**/infrastructure/persistence/entities/*.js'],
-  entitiesTs: ['src/**/infrastructure/persistence/entities/*.ts'],
+  entities: ['dist/**/infrastructure/*Entity.js'],
+  entitiesTs: ['src/**/infrastructure/*Entity.ts'],
   migrations: {
     path: './src/migrations',
   },

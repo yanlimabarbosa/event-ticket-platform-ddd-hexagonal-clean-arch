@@ -1,8 +1,8 @@
 # Session Progress
 
-## Current Phase: 3.3 — Repository Implementations (next)
+## Current Phase: 3.4 — External Service Adapters (next)
 
-Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Domain layer fully built. Application layer complete (all 4 use cases). Infrastructure layer in progress — MikroORM entities and migrations done.
+Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Domain layer fully built. Application layer complete (all 4 use cases). Infrastructure: entities, migrations, mapper, and repository done.
 
 ## Completed Phases
 
@@ -248,6 +248,32 @@ Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Doma
   - Required `@oxc-node/core` for MikroORM CLI to run TypeScript files
   - Required `mikro-orm` section in package.json with `configPaths` for CLI to find config
 
+### Phase 3.3 — Repository Implementation (Mapper + Adapter)
+- Created `OrderMapper` in `src/ordering/infrastructure/OrderMapper.ts`
+  - `toDomain(entity)` — converts OrderEntity (raw DB values) to domain Order (value objects)
+  - Maps `OrderStatusEnum` string → `OrderStatus` value object via statusMap
+  - Maps `OrderItemEntity[]` → `OrderItem[]` wrapping quantity/price in value objects
+  - No `toPersistence` — saving is handled by the repository directly using MikroORM's tracked entities
+  - Used `biome-ignore` for static-only class (Mapper pattern convention)
+- Created `MikroOrmOrderRepository` in `src/ordering/infrastructure/MikroOrmOrderRepository.ts`
+  - Implements `OrderRepository` domain port with MikroORM `EntityManager`
+  - `findById`: loads entity with `populate: ['items']` (joins both tables), maps to domain
+  - `findByAttendeeId`: loads array, maps each to domain. Returns `[]` not `null` for no results
+  - `save`: checks if entity exists → update tracked fields or `em.create()` with items → `em.flush()`
+  - `em.flush()` = Unit of Work pattern — all changes persisted in one transaction
+  - `domainToEnum` map for domain status string → `OrderStatusEnum` (avoids `as` casting)
+- Fixed `OrderEntity` nullable fields: changed `?` (undefined) to `| null` to match domain model
+- Key lessons learned:
+  - Mapper only needs `toDomain` — ORM tracks entities for updates, `em.create` handles inserts
+  - `em.findOne` returns entity tracked by identity map — updating its fields and flushing persists changes
+  - `em.create` registers new entity in identity map without needing to store the return value
+  - `em.flush` writes all tracked changes in one transaction (Unit of Work pattern)
+  - Repository returns `null` for single not-found, empty array `[]` for list queries — never throws
+  - Use case decides what to do with null (throw NotFoundException, etc.)
+  - `populate: ['items']` tells MikroORM to join child table automatically
+  - `?` in TS means `T | undefined`, `| null` means `T | null` — DB nulls should use `| null`
+  - Student wants to write code himself — mentor should give structure/hints, not full implementations
+
 ### Tooling updates
 - Added Biome nursery rules: `noFloatingPromises` (error), `useExplicitType` (error)
 - Fixed VS Code import sorting on save: added `source.fixAll.biome` to codeActionsOnSave
@@ -267,7 +293,7 @@ Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Doma
 8. ~~Phase 2.1~~ ✅ — All 4 use cases complete
 9. ~~Phase 3.1~~ ✅ — MikroORM entities
 10. ~~Phase 3.2~~ ✅ — Migrations
-11. **Phase 3.3** — Repository implementations (mapper + MikroORM adapter)
+11. ~~Phase 3.3~~ ✅ — Repository implementation (mapper + MikroORM adapter)
 12. **Phase 3.4** — External service adapters (fake payment gateway, event availability)
 13. **Phase 3.5** — HTTP controllers
 14. **Phase 3.6** — Error handling (exception filters)

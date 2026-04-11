@@ -4,3 +4,4 @@
 - [Explicit modifiers](feedback_explicit_modifiers.md) — Always write public/private/protected, override, and return types explicitly
 - [Avenir refactor](project_avenir_refactor.md) — Student wants to refactor Avenir's mesa virtual module with DDD later
 - [Don't push](feedback_dont_push.md) — Let the student explore questions at their own pace, don't rush to next task
+- [Let student code](feedback_let_student_code.md) — Give hints and structure, don't write full implementations

@@ -30,13 +30,13 @@ export class OrderEntity {
   created_at!: Date
 
   @Property({ type: 'Date', nullable: true })
-  paid_at?: Date
+  paid_at!: Date | null
 
   @Property({ type: 'Date', nullable: true })
-  cancelled_at?: Date
+  cancelled_at!: Date | null
 
   @Property({ type: 'string', nullable: true })
-  cancel_reason?: string
+  cancel_reason!: string | null
 
   @Property({ type: 'Date' })
   expires_at!: Date

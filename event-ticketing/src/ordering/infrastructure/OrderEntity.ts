@@ -11,34 +11,34 @@ export enum OrderStatusEnum {
 
 @Entity({ tableName: 'orders' })
 export class OrderEntity {
-  @PrimaryKey()
+  @PrimaryKey({ type: 'string' })
   id!: string
 
-  @Property({ columnType: 'decimal' })
+  @Property({ type: 'decimal' })
   total!: number
 
-  @Property()
+  @Property({ type: 'string' })
   event_id!: string
 
-  @Property()
+  @Property({ type: 'string' })
   attendee_id!: string
 
   @Enum(() => OrderStatusEnum)
   status!: OrderStatusEnum
 
-  @Property()
+  @Property({ type: 'Date' })
   created_at!: Date
 
-  @Property({ nullable: true })
+  @Property({ type: 'Date', nullable: true })
   paid_at?: Date
 
-  @Property({ nullable: true })
+  @Property({ type: 'Date', nullable: true })
   cancelled_at?: Date
 
-  @Property({ nullable: true })
+  @Property({ type: 'string', nullable: true })
   cancel_reason?: string
 
-  @Property()
+  @Property({ type: 'Date' })
   expires_at!: Date
 
   @OneToMany(() => OrderItemEntity, (item) => item.order)

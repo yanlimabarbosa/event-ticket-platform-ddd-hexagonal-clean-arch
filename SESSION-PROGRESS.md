@@ -1,8 +1,8 @@
 # Session Progress
 
-## Current Phase: 2.1 — Use Cases (in progress — CreateOrder, PayOrder, CancelOrder done. ExpireOrder next)
+## Current Phase: 3.3 — Repository Implementations (next)
 
-Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Domain layer is fully built. Application layer in progress.
+Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Domain layer fully built. Application layer complete (all 4 use cases). Infrastructure layer in progress — MikroORM entities and migrations done.
 
 ## Completed Phases
 
@@ -205,18 +205,73 @@ Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Doma
   - Doesn't work on: Money, Quantity (validation runs before assignment)
 - Fixed all remaining Biome errors (explicit return types on AggregateRoot, Entity, main.ts)
 
+### Phase 2.1 continued — ExpireOrderUseCase
+- Created `ExpireOrderUseCase` in `src/ordering/application/ExpireOrderUseCase.ts`
+  - Simplest use case: find, guard not found, expire, save
+  - Triggered by the system (scheduled job), not by a person
+  - Student correctly identified that it's the system, not a human, that triggers expiration
+
+### Phase 3.1 — MikroORM Entities (Persistence Model)
+- Created `OrderEntity` in `src/ordering/infrastructure/OrderEntity.ts`
+  - `@Entity({ tableName: 'orders' })` with all columns from DB schema
+  - `@Enum(() => OrderStatusEnum)` for status field
+  - `@Property({ type: 'decimal' })` for money (total)
+  - Nullable fields with `{ nullable: true }` and `?` type
+  - `@OneToMany(() => OrderItemEntity, item => item.order)` with `Collection<OrderItemEntity>`
+  - Created `OrderStatusEnum` (reserved, paid, cancelled, expired) — separate from domain `OrderStatus` value object
+- Created `OrderItemEntity` in `src/ordering/infrastructure/OrderItemEntity.ts`
+  - `@ManyToOne(() => OrderEntity)` with `Ref<OrderEntity>` to resolve circular reference
+  - `@Property({ type: 'decimal' })` for unit_price
+  - `@Property({ type: 'integer' })` for quantity
+- Key lessons learned:
+  - Persistence entities are DUMB data holders — no behavior, no validation, all fields public
+  - Separate from domain models — persistence optimized for storage, domain for business rules
+  - MikroORM v7 moved decorators to `@mikro-orm/decorators/legacy` (NestJS requires legacy because of `experimentalDecorators: true`)
+  - ES spec decorators (`/es`) exist but can't be used with NestJS yet
+  - `@ManyToOne` = "many of THIS entity belong to one of THAT entity" — first word = current entity
+  - `@OneToMany` = inverse side, needs `Collection<T>` type with `new Collection(this)` initialization
+  - MikroORM auto-generates FK column names: field `order` → column `order_id`
+  - Circular references between entities need `Ref<T>` type wrapper from `@mikro-orm/core`
+  - MikroORM v7 without reflect-metadata needs explicit `type` in every decorator
+  - `!` (definite assignment assertion) needed on ORM fields — TS strict mode doesn't know ORM fills them
+
+### Phase 3.2 — Migrations
+- Generated initial migration: `src/migrations/Migration20260411183609.ts`
+  - `npx mikro-orm migration:create --initial` reads entities and generates SQL
+  - `npx mikro-orm migration:up` executes the SQL against PostgreSQL
+- Migration creates: `orders` table, `order_items` table, FK constraint, enum check constraint
+- Key lessons learned:
+  - `migration:create` = generate the SQL plan, `migration:up` = execute it
+  - Migrations run exactly once — MikroORM tracks executed migrations in `mikro_orm_migrations` table
+  - No `IF NOT EXISTS` needed — migrations are designed for one-time execution
+  - Docker volume persists data across container restarts — tables survive restart
+  - Required `@oxc-node/core` for MikroORM CLI to run TypeScript files
+  - Required `mikro-orm` section in package.json with `configPaths` for CLI to find config
+
 ### Tooling updates
 - Added Biome nursery rules: `noFloatingPromises` (error), `useExplicitType` (error)
 - Fixed VS Code import sorting on save: added `source.fixAll.biome` to codeActionsOnSave
+- Moved `biome.json` into `event-ticketing/` for proper VS Code extension detection
+- Added `.vscode/settings.json` in both root and `event-ticketing/` with `biome.lspBin` path
+- Removed deprecated `baseUrl` from tsconfig, replaced with `paths`
+- Installed `dotenv` for MikroORM CLI env loading
+- Installed `@mikro-orm/decorators` for v7 decorator imports
+- Installed `@oxc-node/core` for TS file support in MikroORM CLI
+- Updated all MikroORM packages from 7.0.8 to 7.0.10
 
 ## What's Next
 4. ~~Phase 1.4~~ ✅
 5. ~~Phase 1.5~~ ✅
 6. ~~Phase 1.6~~ ✅
 7. **Phase 1.7** — Domain unit tests (deferred — will write after routes are working)
-8. ~~Phase 2.1~~ ✅ — CreateOrderUseCase, PayOrderUseCase, CancelOrderUseCase
-9. **Phase 2 continued** — ExpireOrderUseCase, then Phase 3
-10. **Phase 3** — Infrastructure layer (MikroORM entities, repository implementations, controllers)
+8. ~~Phase 2.1~~ ✅ — All 4 use cases complete
+9. ~~Phase 3.1~~ ✅ — MikroORM entities
+10. ~~Phase 3.2~~ ✅ — Migrations
+11. **Phase 3.3** — Repository implementations (mapper + MikroORM adapter)
+12. **Phase 3.4** — External service adapters (fake payment gateway, event availability)
+13. **Phase 3.5** — HTTP controllers
+14. **Phase 3.6** — Error handling (exception filters)
+15. **Phase 3.7** — NestJS module wiring
 
 ## Architectural Decisions
 
@@ -248,6 +303,9 @@ Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Doma
 - Had "aha moment" about OOP — understood why anemic models make OOP feel pointless, and why rich models justify classes
 - Prefers to see the full flow working before writing tests (practical learner)
 - Common mistakes: missing `await`, typos in method names, forgetting to assign return values of immutable operations
+- Frustrated by TS/JS tooling friction — recognizes Java/C# are better fits for DDD/OOP patterns
+- Interested in migrating to Java/Spring Boot after finishing this project — wants good job opportunities in Brazil and abroad
+- Wants to do things himself — got frustrated when mentor did too much infrastructure setup without explaining
 
 ## Project Files
 

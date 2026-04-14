@@ -11,6 +11,8 @@ This project follows **DDD + Hexagonal + Clean Architecture** with **NestJS**, *
 
 - **TEACH-ME.md** — The teaching methodology. Defines HOW to teach: the learning loop, phases 0-4 progression, challenge difficulty curve, and mentoring rules.
 
+- **LANGUAGES-FOR-DDD.md** — Deep comparison of Python, JavaScript/TypeScript, Java, and Go for OOP and DDD. Reference for language-choice questions and the rationale behind the planned migration to Java/Spring Boot after this project.
+
 ## Session Continuity — CRITICAL
 
 - **SESSION-PROGRESS.md** — Current phase, completed phases with key lessons, student profile, and what's next.

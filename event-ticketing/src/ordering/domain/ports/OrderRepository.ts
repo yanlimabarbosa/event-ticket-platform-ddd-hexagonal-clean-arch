@@ -1,7 +1,7 @@
 import type { Order } from '../model/Order'
 
-export interface OrderRepository {
-  save(order: Order): Promise<void>
-  findById(id: string): Promise<Order | null>
-  findByAttendeeId(attendeeId: string): Promise<Order[]>
+export abstract class OrderRepository {
+  public abstract save(order: Order): Promise<void>
+  public abstract findById(id: string): Promise<Order | null>
+  public abstract findByAttendeeId(attendeeId: string): Promise<Order[]>
 }

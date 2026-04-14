@@ -24,7 +24,15 @@ export class Order extends AggregateRoot {
     super(id)
   }
 
-  public static create(id: string, eventId: string, attendeeId: string, items: OrderItem[]): Order {
+  private static readonly RESERVATION_WINDOW_MS = 15 * 60 * 1000
+
+  public static create(
+    id: string,
+    eventId: string,
+    attendeeId: string,
+    items: OrderItem[],
+    now: Date,
+  ): Order {
     if (items.length === 0) {
       throw new EmptyOrderItem()
     }
@@ -35,8 +43,8 @@ export class Order extends AggregateRoot {
       attendeeId,
       items,
       OrderStatus.reserved(),
-      new Date(),
-      new Date(Date.now() + 15 * 60 * 1000),
+      now,
+      new Date(now.getTime() + Order.RESERVATION_WINDOW_MS),
       null,
       null,
       null,
@@ -47,9 +55,9 @@ export class Order extends AggregateRoot {
     return order
   }
 
-  public pay(): void {
+  public pay(now: Date): void {
     this.status = this.status.toPaid()
-    this.paidAt = new Date()
+    this.paidAt = now
     this.addDomainEvent(
       new OrderPaid(
         this.id,
@@ -68,9 +76,9 @@ export class Order extends AggregateRoot {
     this.addDomainEvent(new OrderExpired(this.id, this.attendeeId))
   }
 
-  public cancel(cancelReason: string | null): void {
+  public cancel(cancelReason: string | null, now: Date): void {
     this.status = this.status.toCancelled()
-    this.cancelledAt = new Date()
+    this.cancelledAt = now
     this.cancelReason = cancelReason
     this.addDomainEvent(new OrderCancelled(this.id, this.attendeeId, this.cancelReason))
   }

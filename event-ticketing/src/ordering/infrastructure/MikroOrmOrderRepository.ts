@@ -1,4 +1,4 @@
-import type { EntityManager } from '@mikro-orm/postgresql'
+import { EntityManager } from '@mikro-orm/postgresql'
 import { Injectable } from '@nestjs/common'
 import type { Order } from '../domain/model/Order'
 import { OrderRepository } from '../domain/ports/OrderRepository'

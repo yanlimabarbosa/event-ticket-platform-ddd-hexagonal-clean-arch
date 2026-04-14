@@ -12,15 +12,15 @@ export class MikroOrmOrderRepository extends OrderRepository {
   }
 
   public override async save(order: Order): Promise<void> {
-    const existing = await this.em.findOne(OrderEntity, { id: order.id })
+    await this.em.transactional(async (em) => {
+      const existing = await em.findOne(OrderEntity, { id: order.id })
 
-    if (existing) {
-      OrderMapper.applyStateChanges(existing, order)
-    } else {
-      this.em.create(OrderEntity, OrderMapper.toPersistence(order))
-    }
-
-    await this.em.flush()
+      if (existing) {
+        OrderMapper.applyStateChanges(existing, order)
+      } else {
+        em.create(OrderEntity, OrderMapper.toPersistence(order))
+      }
+    })
   }
 
   public override async findById(id: string): Promise<Order | null> {

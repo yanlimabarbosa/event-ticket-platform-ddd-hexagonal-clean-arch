@@ -8,8 +8,8 @@ Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Doma
 
 ## Known Gaps (to revisit)
 
-- **Domain events are recorded but never published.** Use cases call `order.pay()` etc. (which records events) and then call `save()`, but nobody calls `pullDomainEvents()`. Fix later: add a `DomainEventPublisher` port + an EventEmitter2 adapter; drain events after save. Best done after Phase 3.7 module wiring.
-- **`save()` doesn't wrap in an explicit transaction.** MikroORM's implicit flush is usually enough, but `em.transactional()` is safer. Pair with the domain events fix above (outbox pattern needs both).
+- **Domain events are recorded but never published.** Use cases call `order.pay()` etc. (which records events) and then call `save()`, but nobody calls `pullDomainEvents()`. **Decision for Phase 3.8: outbox pattern.** Events get inserted into an `outbox_events` table inside the same transaction as the aggregate write; a background worker polls the table and publishes to EventEmitter2 (later swappable for RabbitMQ/Kafka). Rejected alternatives: direct publish (can lose events on crash), transactional messaging (requires Kafka + complex setup).
+- **Phase 3.8 scaffolding needed:** `outbox_events` migration, `OutboxEventEntity`, `DomainEventPublisher` port, `OutboxDomainEventPublisher` adapter, background worker (NestJS `@Cron` or interval) that polls and marks rows published.
 
 ## Completed Phases
 

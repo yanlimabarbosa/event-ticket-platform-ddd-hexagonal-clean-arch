@@ -1,7 +1,7 @@
-import { DomainError } from 'src/shared/domain/DomainError'
+import { ConflictError } from 'src/shared/domain/ConflictError'
 import type { OrderStatusType } from '../model/OrderStatus'
 
-export class InvalidOrderTransition extends DomainError {
+export class InvalidOrderTransition extends ConflictError {
   public constructor(currentStatus: OrderStatusType, attemptedStatus: OrderStatusType) {
     super(`Cannot transition from ${currentStatus} to ${attemptedStatus}`)
   }

@@ -1,6 +1,6 @@
-import { DomainError } from 'src/shared/domain/DomainError'
+import { ConflictError } from 'src/shared/domain/ConflictError'
 
-export class EventNotAvailable extends DomainError {
+export class EventNotAvailable extends ConflictError {
   public constructor(eventId: string) {
     super(`The event ${eventId} is not available`)
   }

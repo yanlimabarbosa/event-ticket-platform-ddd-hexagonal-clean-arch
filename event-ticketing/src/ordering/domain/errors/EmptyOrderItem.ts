@@ -1,6 +1,6 @@
-import { DomainError } from 'src/shared/domain/DomainError'
+import { ValidationError } from 'src/shared/domain/ValidationError'
 
-export class EmptyOrderItem extends DomainError {
+export class EmptyOrderItem extends ValidationError {
   public constructor() {
     super('An order must have at least 1 item')
   }

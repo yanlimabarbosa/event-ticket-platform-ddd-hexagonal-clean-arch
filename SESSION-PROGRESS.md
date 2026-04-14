@@ -1,15 +1,21 @@
 # Session Progress
 
-## Current Phase: 3.5.6 — Remaining HTTP endpoints (next)
+## Current Phase: 3.7 — Module wiring review (next, mostly done), then 3.8 Outbox
 
-First successful end-to-end request was made: `POST /orders` creates a row in Postgres and returns the full order DTO. Full stack alive: HTTP → controller → use case → domain → repository → DB → response.
+All 4 HTTP endpoints live (create / list by attendee / pay / cancel). Global `DomainExceptionFilter` maps domain errors → HTTP via marker parent classes (`NotFoundError`, `ConflictError`, `ValidationError`). Money columns migrated from `numeric(10,0)` → `integer` to fix DB round-trip type mismatch. REST Client `.http` file added with all 15 scenarios (happy path + unhappy paths + validation failures).
 
-Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Domain layer fully built. Application layer complete (all 4 use cases). Infrastructure: entities, migrations, mapper, repository, and all 5 adapters done (MikroOrm repo, CryptoIdGenerator, SystemClock, FakePaymentGateway, FakeEventAvailabilityChecker). Ports refactored to abstract classes; `IdGenerator`, `Clock` ports + adapters added. `OrderNotFound` domain error replaces NestJS `NotFoundException` in use cases. Biome configs consolidated. HTTP layer underway: global `ValidationPipe`, `CreateOrderRequestDto` + `OrderResponseDto`, `OrderController` with `POST /orders`, `OrderingModule` wired with full DI graph. First end-to-end curl succeeded.
+Phases 0, 1.1–1.6, 2.1, 3.1–3.6 complete. Phase 1.7 (tests) deferred until Phase 4. Domain + application + infrastructure fully built for Ordering context. All ports are abstract classes. All use cases wired with DI. HTTP layer fully functional.
 
 ## Known Gaps (to revisit)
 
 - **Domain events are recorded but never published.** Use cases call `order.pay()` etc. (which records events) and then call `save()`, but nobody calls `pullDomainEvents()`. **Decision for Phase 3.8: outbox pattern.** Events get inserted into an `outbox_events` table inside the same transaction as the aggregate write; a background worker polls the table and publishes to EventEmitter2 (later swappable for RabbitMQ/Kafka). Rejected alternatives: direct publish (can lose events on crash), transactional messaging (requires Kafka + complex setup).
 - **Phase 3.8 scaffolding needed:** `outbox_events` migration, `OutboxEventEntity`, `DomainEventPublisher` port, `OutboxDomainEventPublisher` adapter, background worker (NestJS `@Cron` or interval) that polls and marks rows published.
+- **IDOR vulnerabilities — identity fields come from client-controlled input.** Current API trusts `attendeeId` from request body (`POST /orders`) and query param (`GET /orders?attendeeId=X`). Any caller can create orders on someone else's behalf or list anyone's orders. **Resolved in Phase 5.0 (Auth).** When auth lands, refactor ALL affected surfaces:
+  - Remove `attendeeId` from `CreateOrderRequestDto` — source it from `@CurrentAttendee()` decorator instead
+  - Replace `GET /orders?attendeeId=X` with `GET /orders/me` — no tamperable query param
+  - Audit every future endpoint/DTO for the same pattern (organizerId when Event Management lands, any `*Id` that refers to the authenticated user)
+  - Add role-based guards where needed (e.g., only an Organizer can cancel their own event; only the owning Attendee can cancel their own order)
+  - General rule: **identity fields must never be trusted from request payloads** — always from the verified token/session.
 
 ## Completed Phases
 
@@ -427,6 +433,21 @@ Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Doma
   - `@Body() body: CreateOrderRequestDto` triggers the global `ValidationPipe` automatically: parses JSON, instantiates DTO, runs validators, 400 on failure.
   - Biome rejects parameter decorators by default (Stage-3 spec). Fixed in `biome.json` with `javascript.parser.unsafeParameterDecoratorsEnabled: true`. The `unsafe` label is about future-compatibility, not security.
 
+### Phase 3.5.6 — Remaining HTTP endpoints (create, list, pay, cancel complete)
+- Added `PayOrderRequestDto` — `paymentToken: string`, `paymentMethod: PaymentMethod` with `@IsIn(PAYMENT_METHODS)`. Array of valid methods typed as `PaymentMethod[]` so adding a new method forces a compile error here.
+- Added `CancelOrderRequestDto` — `reason?: string` with `@IsOptional` + `@MaxLength(500)`.
+- Added `ListAttendeeOrdersUseCase` — thin query use case wrapping `orderRepository.findByAttendeeId`. Kept as its own file even though it's 3 lines today: future home for pagination/filter/caching.
+- Refactored `PayOrderUseCase.execute` and `CancelOrderUseCase.execute` from `Promise<void>` → `Promise<Order>` — controllers now return the updated order DTO.
+- `OrderController` expanded with 3 new endpoints: `GET /orders?attendeeId=X` (`findByAttendeeId`), `POST /orders/:id/pay` (`pay`), `POST /orders/:id/cancel` (`cancel`). Registered new use cases in `ordering.module.ts`.
+- Added `requests.http` (REST Client format) with 15 scenarios covering happy path, domain errors, DTO validation, and boundary coercion (null reason).
+- Key lessons learned:
+  - **Never trust identity fields from request payloads — IDOR vulnerability.** Current `POST /orders` accepts `attendeeId` in the body; `GET /orders?attendeeId=X` accepts it as query param. In production, identity must come from the auth token via `@CurrentAttendee()` decorator. Flagged in Known Gaps; scheduled as Phase 5.0.
+  - **Types-at-the-boundary must match across the chain.** `CancelOrderRequestDto.reason` was `?` (undefined), but `CancelOrderUseCase.execute(cancelReason)` required `string` — TS strict would reject the controller call. Fixed by propagating `string | null` all the way through and using `body.reason ?? null` at the controller boundary. Rule: DB nullable column → domain `string | null` → use case `string | null` → controller coerces `undefined → null` with `??` (never `||`, which would also swallow empty strings).
+  - **Method naming: describe what the method guarantees, not what it might one day do.** `findByAttendeeId` is honest when `attendeeId` is a required query param; `list()` implies optional filters. Match the method name to the constraint the signature enforces. Also mirrors `OrderRepository.findByAttendeeId` across layers — reading the stack is one consistent verb.
+  - **Route params require `:id` in the path.** `@Post(':id/pay')` not `@Post('pay')`. `@Param('id')` silently returns `undefined` without the placeholder — a bug TS can't catch. Caught only at runtime by "order not found" errors. This is exactly what Phase 4.2 integration tests will catch.
+  - **Explicit-over-implicit is codebase-wide, not just TS syntax.** `@HttpCode(HttpStatus.OK)` on GET endpoints is noise to some, clarity to this codebase — framework defaults should never be load-bearing knowledge. Same rule extends to `@HttpCode(HttpStatus.CREATED)` on POST, `transform: true` on ValidationPipe, etc.
+  - **Thin query use cases are still worth their own file.** `ListAttendeeOrdersUseCase` is 3 lines. Keeping it as a use case (not calling repo directly from controller) means Phase 6.1 caching, Phase 6.2 pagination, and Phase 7 read-model projections all change in ONE place. Symmetry across layers > saving 5 lines today.
+
 ### Phase 3.5.5 — OrderingModule wiring + first successful curl
 - Created `src/ordering/ordering.module.ts`:
   - `imports: MikroOrmModule.forFeature([OrderEntity, OrderItemEntity])` — registers entities in this module's scope
@@ -451,6 +472,39 @@ Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Doma
     - Long form `{ provide: Port, useClass: Adapter }` — when token differs from implementation (hexagonal port/adapter).
   - Spring Boot equivalent: `@Service` / `@Repository` on adapter classes + component scanning replaces the entire providers array in the common case. `@Configuration` + `@Bean` is the equivalent when explicit wiring is needed (conditional / third-party / multi-impl cases).
 
+### Phase 3.5.7 — Money column type fix (numeric → integer)
+- Bug surfaced when `GET /orders?attendeeId=X` was first tested: `InvalidMoney: Invalid money amount: 5000. Must be a non-negative integer (cents)`. `POST /orders` never triggered it because the create flow never loads from DB — first DB→domain round-trip was via `findByAttendeeId`.
+- Root cause: `@Property({ type: 'decimal' })` on `unit_price` and `total` produced SQL column `numeric(10,0)`. The `pg` driver returns ALL `numeric`-family values as **JS strings** (to preserve precision), not numbers. `Number.isInteger("5000")` returns `false` because the type is string, not number. `Money.create` rejected it.
+- `numeric(10,0)` is a trap — looks integer-like (0 decimal places), but it's still in the NUMERIC family. pg's string-return rule is per family, not per precision.
+- Fix: changed `@Property({ type: 'decimal' })` → `@Property({ type: 'integer' })` on both `OrderEntity.total` and `OrderItemEntity.unit_price`. Generated migration `Migration20260414222827.ts` which runs `ALTER COLUMN ... TYPE integer USING <col>::integer`. Existing rows cast cleanly since values were all integer-valued.
+- Key lessons learned:
+  - **Column type must match domain invariant.** Domain says "Money is integer cents" → column must be `integer`, not `numeric`. The TS field type was already `number` — the mismatch was between the TS lie and runtime reality (string from pg).
+  - **Stripe / industry pattern: money stored as integer cents everywhere.** Frontend sends cents, backend works in cents, DB stores cents. Formatting ("$59.50") happens at display time only. No `Number` float math anywhere — integer arithmetic is exact.
+  - **Dormant bugs surface on new code paths.** Create worked because it builds Order in-memory and returns it without a DB read. First DB read (findByAttendeeId) triggered the bug. Integration tests against a real DB (Phase 4.2) will catch this category of bug in the future.
+  - **DECIMAL/NUMERIC is for actual decimal values** (crypto precision, tax rates, FX). Cents are integer by definition — DECIMAL is the wrong type.
+
+### Phase 3.6 — Global Exception Filter with Marker Error Categories
+- Created `DomainExceptionFilter` in `src/shared/infrastructure/http/`. `@Catch(DomainError)` catches any subclass. Maps domain error → HTTP status using `instanceof` ladder on marker parent classes. Response body matches `DOMAIN.md` spec: `{ statusCode, error: class name, message }`.
+- Registered globally in `src/main.ts` with `app.useGlobalFilters(new DomainExceptionFilter())`.
+- Created 3 marker parent classes in `src/shared/domain/`:
+  - `NotFoundError` → 404
+  - `ConflictError` → 409
+  - `ValidationError` → 400
+- Repointed all 8 concrete domain errors to extend the correct marker:
+  - `OrderNotFound` → `NotFoundError`
+  - `InvalidOrderTransition`, `EventNotAvailable`, `InsufficientTickets`, `PaymentFailed` → `ConflictError`
+  - `EmptyOrderItem`, `InvalidMoney`, `InvalidQuantity` → `ValidationError`
+- Design iteration: considered 4 approaches (central map in filter, abstract `httpStatus` property, marker parent classes, discriminated-union kind enum). Settled on marker parent classes after researching 2024-2026 senior NestJS-DDD practice.
+- Key lessons learned:
+  - **Marker parent classes are the mainstream DDD-pure pattern in NestJS and Spring Boot.** Domain stays HTTP-agnostic — zero imports of `@nestjs/common` anywhere in `domain/`. HTTP mapping lives entirely in the filter (infrastructure).
+  - **Type hierarchy encodes meaning.** `OrderNotFound extends NotFoundError` is self-documenting — "this is a not-found kind of error" is a type fact. Can `catch (e instanceof NotFoundError)` meaningfully across any not-found error in the system.
+  - **Adding a new error = 1 line (`extends ConflictError`).** Filter is never edited again. New category (rare, ~5 total HTTP categories ever) = 1 marker class + 1 branch in filter. Filter edits should be rare events.
+  - **Collapsed `PaymentError` into `ConflictError`.** Original design had a dedicated `PaymentError` marker for `PaymentFailed` (→ 402). One-member categories are over-engineering — a category earns its existence at 2+ concrete subclasses. 402 is an obscure HTTP status anyway; 409 is the right semantic for "payment couldn't advance the order state."
+  - **Transfers 1:1 to Spring Boot.** `@ControllerAdvice` + `@ExceptionHandler(NotFoundException.class)` is the Java equivalent of the `instanceof` ladder. The marker-parent pattern is portable across frameworks and even transports (gRPC, CLI) — the filter is the adapter, domain doesn't know.
+  - **Never `throw new NotFoundException()` (or any `HttpException`) from use cases.** That imports `@nestjs/common` into the application layer, couples business logic to HTTP, and breaks non-HTTP adapters (cron jobs, gRPC, CLI). Rule: if you can still throw it from a CLI script, it's a `DomainError`. Otherwise it's framework and belongs in infra only.
+  - **Response shape differences matter for API consumers.** Nest default: `{ statusCode, message, error: "Not Found" }`. Our filter: `{ statusCode, error: "OrderNotFound", message }`. Mixing patterns creates inconsistent API. Commit to one — ours is richer (specific class name as the error field).
+  - **Researched 2024-2026 practice:** marker parents + `@Catch(DomainError)` is mainstream. Gaps seniors add: catch-all `@Catch()` filter with correlation IDs, Pino logging, Sentry, MikroORM constraint error translation, RFC 9457 Problem Details response format. All belong to Phase 5.3 (Observability). `neverthrow` / Result types are niche and don't transfer to Java — skipped.
+
 ### Tooling updates
 - Added Biome nursery rules: `noFloatingPromises` (error), `useExplicitType` (error)
 - Fixed VS Code import sorting on save: added `source.fixAll.biome` to codeActionsOnSave
@@ -471,11 +525,11 @@ Goal: student becomes capable of designing and building distributed, event-drive
 - ~~3.2~~ ✅ Migrations
 - ~~3.3~~ ✅ Repository implementation + follow-ups (bidirectional mapper, abstract-class ports, IdGenerator, Clock, OrderNotFound, biome consolidation)
 - ~~3.4~~ ✅ Fake adapters (FakePaymentGateway, FakeEventAvailabilityChecker)
-- **Phase 3.5** — HTTP controllers (3.5.1–3.5.5 done; `POST /orders` works end-to-end)
-    - **3.5.6 NEXT** — remaining endpoints: `GET /orders?attendeeId=X`, `POST /orders/:id/pay`, `POST /orders/:id/cancel` + their DTOs + `ListAttendeeOrdersUseCase`
-- **3.6** — Exception filters mapping `DomainError` → HTTP status codes
-- **3.7** — Final NestJS module wiring review (mostly done)
-- **3.8** — Outbox pattern: `outbox_events` table, `DomainEventPublisher` port, `OutboxDomainEventPublisher` adapter, background worker polling & publishing via EventEmitter2. Closes audit item #1.
+- ~~3.5~~ ✅ HTTP controllers — all 4 endpoints live (create / list / pay / cancel) + DTOs + REST Client `.http` scenarios
+- ~~3.5.7~~ ✅ Money column fix (numeric → integer) — DB type now matches domain invariant
+- ~~3.6~~ ✅ Global `DomainExceptionFilter` + marker error categories (`NotFoundError` / `ConflictError` / `ValidationError`)
+- **3.7 NEXT** — Final NestJS module wiring review (mostly done, quick sanity check)
+- **3.8** — Outbox pattern: `outbox_events` table, `DomainEventPublisher` port, `OutboxDomainEventPublisher` adapter, background worker polling & publishing via EventEmitter2. Closes audit item #1 (domain events never published).
 
 ### Phase 4 — Testing + second bounded context (events hands-on)
 - **4.1** Domain unit tests (aggregates, value objects, business rules)
@@ -484,8 +538,9 @@ Goal: student becomes capable of designing and building distributed, event-drive
 - **4.4** **Swap EventEmitter2 for RabbitMQ** — real message broker via Docker. Add management UI (port 15672) so you can SEE messages flow. First hands-on broker experience.
 - **4.5** **Inbox pattern in Check-in** — consumer-side dedup table. At-least-once delivery + inbox = exactly-once processing. Only makes sense once you have a real broker.
 
-### Phase 5 — Microservices split + production concerns
-- **5.1** Split Check-in into its own NestJS app with its own DB. `docker-compose.yml` with 4 containers: postgres-ordering, postgres-checkin, rabbitmq, ordering-app, checkin-app. First real microservices deployment.
+### Phase 5 — Auth + microservices split + production concerns
+- **5.0** **Auth + IDOR refactor.** JWT auth with NestJS `@nestjs/passport` + `passport-jwt`. Custom `@CurrentAttendee()` / `@CurrentOrganizer()` param decorators that extract identity claims from the verified token. Global `AuthGuard`. **Refactor every controller/DTO that currently trusts a client-supplied identity field** — remove `attendeeId` from `CreateOrderRequestDto`, replace `GET /orders?attendeeId=X` with `GET /orders/me`, audit future endpoints as they're added. Add role-based guards for cross-role operations (Organizer cancels event, Attendee cancels own order). This closes the IDOR gap called out in Known Gaps.
+- **5.1** Split Check-in into its own NestJS app with its own DB. `docker-compose.yml` with 4 containers: postgres-ordering, postgres-checkin, rabbitmq, ordering-app, checkin-app. First real microservices deployment. Auth strategy across services: shared JWT secret or a small auth service — decide when we get there.
 - **5.2** Real `StripePaymentGateway` adapter — swap the fake, Stripe test mode with webhooks. Portfolio-grade integration.
 - **5.3** Observability — structured JSON logging via Pino, correlation IDs propagated through HTTP headers and event metadata, basic Prometheus metrics.
 - **5.4** Resilience patterns — retry with exponential backoff on PaymentGateway, circuit breaker on EventAvailabilityChecker, timeouts on all external calls.

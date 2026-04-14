@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
-import type { OrderRepository } from '../domain/ports/OrderRepository'
+import { Injectable } from '@nestjs/common'
+import { OrderNotFound } from '../domain/errors/OrderNotFound'
+import { OrderRepository } from '../domain/ports/OrderRepository'
 
 @Injectable()
 export class ExpireOrderUseCase {
@@ -9,7 +10,7 @@ export class ExpireOrderUseCase {
     const order = await this.orderRepository.findById(orderId)
 
     if (!order) {
-      throw new NotFoundException()
+      throw new OrderNotFound(orderId)
     }
 
     order.expire()

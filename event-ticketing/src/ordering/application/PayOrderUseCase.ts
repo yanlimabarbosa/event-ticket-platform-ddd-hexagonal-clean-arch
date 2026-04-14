@@ -1,13 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
+import { OrderNotFound } from '../domain/errors/OrderNotFound'
 import { PaymentFailed } from '../domain/errors/PaymentFailed'
-import type { OrderRepository } from '../domain/ports/OrderRepository'
-import type { PaymentGateway, PaymentMethod } from '../domain/ports/PaymentGateway'
+import { Clock } from '../domain/ports/Clock'
+import { OrderRepository } from '../domain/ports/OrderRepository'
+import { PaymentGateway, type PaymentMethod } from '../domain/ports/PaymentGateway'
 
 @Injectable()
 export class PayOrderUseCase {
   public constructor(
     private readonly orderRepository: OrderRepository,
     private readonly paymentGateway: PaymentGateway,
+    private readonly clock: Clock,
   ) {}
 
   public async execute(
@@ -18,7 +21,7 @@ export class PayOrderUseCase {
     const order = await this.orderRepository.findById(orderId)
 
     if (!order) {
-      throw new NotFoundException()
+      throw new OrderNotFound(orderId)
     }
 
     const paymentCharge = await this.paymentGateway.charge(
@@ -32,7 +35,7 @@ export class PayOrderUseCase {
       throw new PaymentFailed(orderId)
     }
 
-    order.pay()
+    order.pay(this.clock.now())
 
     await this.orderRepository.save(order)
   }

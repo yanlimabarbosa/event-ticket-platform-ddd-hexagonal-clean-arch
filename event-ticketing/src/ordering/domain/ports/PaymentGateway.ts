@@ -1,7 +1,7 @@
 export type PaymentMethod = 'credit_card' | 'pix' | 'boleto'
 
-export interface PaymentGateway {
-  charge(
+export abstract class PaymentGateway {
+  public abstract charge(
     orderId: string,
     amount: number,
     paymentToken: string,

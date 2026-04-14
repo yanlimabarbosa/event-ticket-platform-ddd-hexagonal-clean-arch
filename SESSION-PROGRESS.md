@@ -1,8 +1,10 @@
 # Session Progress
 
-## Current Phase: 3.4 — External Service Adapters (next)
+## Current Phase: 3.5.6 — Remaining HTTP endpoints (next)
 
-Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Domain layer fully built. Application layer complete (all 4 use cases). Infrastructure: entities, migrations, mapper, and repository done. Ports refactored to abstract classes; `IdGenerator`, `Clock` ports + adapters added. `OrderNotFound` domain error replaces NestJS `NotFoundException` in use cases. Biome configs consolidated.
+First successful end-to-end request was made: `POST /orders` creates a row in Postgres and returns the full order DTO. Full stack alive: HTTP → controller → use case → domain → repository → DB → response.
+
+Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Domain layer fully built. Application layer complete (all 4 use cases). Infrastructure: entities, migrations, mapper, repository, and all 5 adapters done (MikroOrm repo, CryptoIdGenerator, SystemClock, FakePaymentGateway, FakeEventAvailabilityChecker). Ports refactored to abstract classes; `IdGenerator`, `Clock` ports + adapters added. `OrderNotFound` domain error replaces NestJS `NotFoundException` in use cases. Biome configs consolidated. HTTP layer underway: global `ValidationPipe`, `CreateOrderRequestDto` + `OrderResponseDto`, `OrderController` with `POST /orders`, `OrderingModule` wired with full DI graph. First end-to-end curl succeeded.
 
 ## Known Gaps (to revisit)
 
@@ -372,6 +374,83 @@ Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Doma
   - Biome `useImportType` is a trap for NestJS projects: it converts class imports used only in type annotations to `import type`, but `emitDecoratorMetadata` needs them as runtime values for DI to work.
   - LSP configuration is cached in memory — after editing `biome.json`/`tsconfig.json`/`eslint.config.js`, restart the LSP or reload the editor window.
 
+### Phase 3.4 — External Service Adapters
+- Created `FakePaymentGateway` in `src/ordering/infrastructure/FakePaymentGateway.ts`. Extends `PaymentGateway`, `@Injectable`, deterministic failure trigger: if `paymentToken` starts with `fail-`, returns `false`. Otherwise succeeds. Logs each charge.
+- Created `FakeEventAvailabilityChecker` in `src/ordering/infrastructure/FakeEventAvailabilityChecker.ts`. Extends `EventAvailabilityChecker`, `@Injectable`, in-memory seed data in constructor: events (`evt-rock-festival` open, `evt-closed-concert` closed) and tickets (`ticket-vip` 10, `ticket-general` 100, `ticket-sold-out` 0). Unknown keys return safe defaults (`false`, `0`).
+- Key lessons learned:
+  - **Fakes vs mocks:** fakes are real production adapters with hardcoded behavior. Mocks are per-test test doubles. Fakes run during normal app execution; mocks are injected by test setup.
+  - Deterministic failure triggers (`fail-` prefix) beat random failures for reproducible QA via curl.
+  - `Map<K, V>` over plain objects when keys are dynamic/user-provided: no prototype pollution, cleaner `.get()/.size` semantics, closer in shape to the eventual real adapter (which will query a repo).
+  - `?? 0` and `?? false` matter vs `||` — `||` treats `0` as falsy, would use default when the real value IS 0.
+  - Common JS bug: `console.log\`text ${var}\`` is a **tagged template literal**, not a function call. Needs parens: `console.log(\`text ${var}\`)`. Looks like a function call but isn't.
+
+### Phase 3.5.1 — ValidationPipe setup
+- Installed `class-validator` + `class-transformer` via pnpm.
+- Enabled global `ValidationPipe` in `src/main.ts` with 4 options:
+  - `whitelist: true` — strips properties not in DTOs.
+  - `forbidNonWhitelisted: true` — 400 on unknown properties instead of stripping.
+  - `transform: true` — instantiates DTO classes from plain JSON (required for `@Type()` nested DTOs).
+  - `transformOptions.enableImplicitConversion: true` — coerces query string types (`?page=1` → `page: number`).
+- Key lessons: `whitelist + forbidNonWhitelisted` is the security-conscious default against mass-assignment bugs. `transform + enableImplicitConversion` is critical for GET endpoints with query params.
+
+### Phase 3.5.2 — CreateOrderRequestDto
+- Created `src/ordering/infrastructure/http/dtos/CreateOrderRequestDto.ts` with two classes:
+  - `CreateOrderItemDto` — `ticketTypeId: string`, `quantity: number` (integer, min 1), `unitPrice: number` (integer, min 0)
+  - `CreateOrderRequestDto` — `eventId: string`, `attendeeId: string`, `items: CreateOrderItemDto[]` (non-empty array)
+- Decorators: `@IsString`, `@IsNotEmpty`, `@IsInt`, `@Min`, `@IsArray`, `@ArrayMinSize`, `@ValidateNested({ each: true })`, `@Type(() => CreateOrderItemDto)`.
+- Key lessons learned:
+  - **Decorators don't work on interfaces.** Must be `class` — interfaces are erased at compile time, decorators need runtime targets. Same root cause as the abstract-class ports workaround.
+  - Request DTOs = **classes** (need runtime decorators for validation). Response DTOs = **interfaces** (zero runtime behavior, shape contract only).
+  - `@Type(() => CreateOrderItemDto)` + `@ValidateNested({ each: true })` BOTH required for nested validation. Missing `@Type` is the #1 "my nested validation doesn't work" NestJS bug.
+  - Use `!` (definite assignment assertion) on DTO fields in TS strict mode — NestJS assigns them via `plainToClass`, TS can't see it.
+  - `@Min(1)` on quantity vs `@Min(0)` on unitPrice reflects domain invariants at the boundary (free tickets OK, zero-quantity items not).
+
+### Phase 3.5.3 — OrderResponseDto + mapper function
+- Created `src/ordering/infrastructure/http/dtos/OrderResponseDto.ts` with:
+  - `OrderItemResponseDto` interface (flat primitives)
+  - `OrderResponseDto` interface (id, eventId, attendeeId, status, total, items, createdAt, expiresAt, paidAt, cancelledAt, cancelReason)
+  - `toOrderResponseDto(order: Order): OrderResponseDto` free function that maps domain to response DTO
+- Design choices:
+  - Response DTOs as **interfaces** (zero runtime behavior needed) — contrast with request DTOs as classes.
+  - JSON-friendly primitives only: Date → ISO string via `.toISOString()`, Money → integer cents via `.getValue()`, OrderStatus → string via `.getValue()`.
+  - Mapper is a **free function**, not a class. Stateless transformation doesn't need DI or instance methods.
+  - `paidAt: order.getPaidAt()?.toISOString() ?? null` — optional chain AND explicit null fallback. Without `?? null`, optional chain returns `undefined` which gets stripped by `JSON.stringify`.
+- Key lessons: never return domain objects from controllers; DTOs decouple API contract from internal domain structure. Renaming a domain field is safe because the DTO buffers the change.
+
+### Phase 3.5.4 — OrderController with POST /orders
+- Created `src/ordering/infrastructure/http/OrderController.ts` with:
+  - `@Controller('orders')` — route prefix
+  - Constructor injects `CreateOrderUseCase` by type (no `@Inject`)
+  - `@Post() @HttpCode(HttpStatus.CREATED) create(@Body() body: CreateOrderRequestDto)` — delegates to use case, maps result to response DTO
+- Key lessons learned:
+  - Controllers are thin — no business logic, no try/catch. Domain errors propagate to the (future) exception filter.
+  - `@Body() body: CreateOrderRequestDto` triggers the global `ValidationPipe` automatically: parses JSON, instantiates DTO, runs validators, 400 on failure.
+  - Biome rejects parameter decorators by default (Stage-3 spec). Fixed in `biome.json` with `javascript.parser.unsafeParameterDecoratorsEnabled: true`. The `unsafe` label is about future-compatibility, not security.
+
+### Phase 3.5.5 — OrderingModule wiring + first successful curl
+- Created `src/ordering/ordering.module.ts`:
+  - `imports: MikroOrmModule.forFeature([OrderEntity, OrderItemEntity])` — registers entities in this module's scope
+  - `controllers: [OrderController]`
+  - `providers`: all 4 use cases (shorthand), all 5 port → adapter bindings using `{ provide: Port, useClass: Adapter }`
+- Imported `OrderingModule` into `AppModule`.
+- Fixed two runtime DI failures caused by `import type`:
+  - `MikroOrmOrderRepository` imported `EntityManager` as type → NestJS couldn't resolve it → `UnknownDependenciesException` at boot. Changed to value import.
+  - `AppController` imported `AppService` as type → same error. Changed to value import.
+- Ran pending migration (`npx mikro-orm migration:up`) against restarted DB container.
+- First successful `curl`:
+  ```
+  curl -X POST http://localhost:3000/orders -d '{"eventId":"evt-rock-festival","attendeeId":"att-1","items":[{"ticketTypeId":"ticket-vip","quantity":2,"unitPrice":5000}]}'
+  ```
+  Response: full `OrderResponseDto` with generated UUID, `status: "reserved"`, `total: 10000`, `expiresAt` exactly 15 minutes after `createdAt`, row confirmed in Postgres `orders` table.
+- Key lessons learned:
+  - **NEVER `import type` a class that enters NestJS DI.** Applies to EntityManager, repository classes, services, anything in a constructor parameter. Type-only imports are erased; DI needs the runtime value.
+  - Composition root pattern: `ordering.module.ts` is allowed to import all concrete adapters — that's its job. Domain and application layers stay pure.
+  - `forFeature` per module vs `forRoot` in app module: `forRoot` establishes the DB connection once; `forFeature` registers entities per-module scope. Different levels of setup.
+  - Provider forms in NestJS:
+    - Shorthand `CreateOrderUseCase` = `{ provide: CreateOrderUseCase, useClass: CreateOrderUseCase }` — no abstraction swap needed.
+    - Long form `{ provide: Port, useClass: Adapter }` — when token differs from implementation (hexagonal port/adapter).
+  - Spring Boot equivalent: `@Service` / `@Repository` on adapter classes + component scanning replaces the entire providers array in the common case. `@Configuration` + `@Bean` is the equivalent when explicit wiring is needed (conditional / third-party / multi-impl cases).
+
 ### Tooling updates
 - Added Biome nursery rules: `noFloatingPromises` (error), `useExplicitType` (error)
 - Fixed VS Code import sorting on save: added `source.fixAll.biome` to codeActionsOnSave
@@ -393,10 +472,11 @@ Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Doma
 10. ~~Phase 3.2~~ ✅ — Migrations
 11. ~~Phase 3.3~~ ✅ — Repository implementation (mapper + MikroORM adapter)
 12. ~~Phase 3.3 follow-ups~~ ✅ — Bidirectional mapper, abstract-class ports, IdGenerator + Clock + OrderNotFound, biome consolidation
-13. **Phase 3.4** — External service adapters (FakePaymentGateway, FakeEventAvailabilityChecker) — NEXT
-14. **Phase 3.5** — HTTP controllers
-15. **Phase 3.6** — Error handling (exception filters)
-16. **Phase 3.7** — NestJS module wiring
+13. ~~Phase 3.4~~ ✅ — Fake adapters done (FakePaymentGateway + FakeEventAvailabilityChecker)
+14. **Phase 3.5** — HTTP controllers (3.5.1–3.5.5 done; `POST /orders` works end-to-end)
+    - 3.5.6 NEXT — remaining endpoints: `GET /orders?attendeeId=X`, `POST /orders/:id/pay`, `POST /orders/:id/cancel` + their DTOs + `ListAttendeeOrdersUseCase`
+15. **Phase 3.6** — Error handling (exception filters mapping `DomainError` → HTTP codes)
+16. **Phase 3.7** — NestJS module wiring (already done provisionally in 3.5.5; revisit if needed)
 17. **Phase 3.8** — Domain event publisher + transactional save (outbox pattern) — fixes remaining audit gaps
 
 ## Architectural Decisions

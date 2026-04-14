@@ -490,15 +490,16 @@ Goal: student becomes capable of designing and building distributed, event-drive
 - **5.3** Observability — structured JSON logging via Pino, correlation IDs propagated through HTTP headers and event metadata, basic Prometheus metrics.
 - **5.4** Resilience patterns — retry with exponential backoff on PaymentGateway, circuit breaker on EventAvailabilityChecker, timeouts on all external calls.
 
-### Phase 6 — Scale-out reads
-- **6.1** CQRS — split commands and queries, dedicated read models for list endpoints.
-- **6.2** Redis cache for `GET /orders/:id` with TTL + invalidation on domain events.
-- **6.3** Pagination, filtering, sorting on list endpoints.
+### Phase 6 — Scale-out reads + architect-tier patterns
+- **6.1** Redis cache for `GET /orders/:id` with TTL + invalidation on domain events.
+- **6.2** Pagination, filtering, sorting on list endpoints.
+- **6.3** Event sourcing for the Order aggregate — events ARE the source of truth; state is projected from events. Compare trade-offs vs state-based approach.
+- **6.4** Saga pattern — distributed transaction across Ordering + Check-in when an order is created and tickets must be pre-reserved atomically.
 
-### Phase 7 — Stretch / architect-tier
-- **7.1** Event sourcing for the Order aggregate — events ARE the source of truth; state is projected from events. Compare trade-offs vs state-based approach.
-- **7.2** Saga pattern — distributed transaction across Ordering + Check-in when an order is created and tickets must be pre-reserved atomically.
-- **7.3** Write a teardown doc: what the student learned, trade-offs, when to use each pattern in the wild.
+### Phase 7 — CQRS refactor (LAST step)
+- **7.1** Refactor existing use cases to CQRS using `@nestjs/cqrs`: separate CommandBus, QueryBus, EventBus. Commands mutate, queries read.
+- **7.2** Dedicated read models for list endpoints — optimized projections built from events.
+- **7.3** Write a teardown doc: what the student learned, trade-offs, when to use each pattern in the wild. CQRS chosen last because it's a refactor of working code, not a new capability.
 
 ### Time estimate (honest)
 - Phase 3.5–3.8: ~1 week

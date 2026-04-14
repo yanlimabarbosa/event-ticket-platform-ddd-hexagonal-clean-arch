@@ -14,7 +14,7 @@ export class OrderEntity {
   @PrimaryKey({ type: 'string' })
   id!: string
 
-  @Property({ type: 'decimal' })
+  @Property({ type: 'integer' })
   total!: number
 
   @Property({ type: 'string' })

@@ -13,7 +13,7 @@ export class OrderItemEntity {
   @Property({ type: 'integer' })
   quantity!: number
 
-  @Property({ type: 'decimal' })
+  @Property({ type: 'integer' })
   unit_price!: number
 
   @Property({ type: 'string' })

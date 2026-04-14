@@ -16,7 +16,8 @@
       },
       "style": {
         "noNonNullAssertion": "warn",
-        "useConst": "error"
+        "useConst": "error",
+        "useImportType": "off"
       },
       "suspicious": {
         "noExplicitAny": "warn"
@@ -35,7 +36,7 @@
     }
   },
   "files": {
-    "includes": ["event-ticketing/src/**", "event-ticketing/test/**"],
+    "includes": ["event-ticketing/src/**", "event-ticketing/test/**", "!event-ticketing/src/migrations/**"],
     "ignoreUnknown": true
   }
 }

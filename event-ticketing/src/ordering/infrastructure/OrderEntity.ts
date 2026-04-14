@@ -41,6 +41,9 @@ export class OrderEntity {
   @Property({ type: 'Date' })
   expires_at!: Date
 
-  @OneToMany(() => OrderItemEntity, (item) => item.order)
+  @OneToMany(
+    () => OrderItemEntity,
+    (item) => item.order,
+  )
   items = new Collection<OrderItemEntity>(this)
 }

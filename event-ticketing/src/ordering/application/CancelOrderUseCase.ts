@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { OrderNotFound } from '../domain/errors/OrderNotFound'
+import { Order } from '../domain/model/Order'
 import { Clock } from '../domain/ports/Clock'
 import { OrderRepository } from '../domain/ports/OrderRepository'
 
@@ -10,7 +11,7 @@ export class CancelOrderUseCase {
     private readonly clock: Clock,
   ) {}
 
-  public async execute(orderId: string, cancelReason: string): Promise<void> {
+  public async execute(orderId: string, cancelReason: string | null): Promise<Order> {
     const order = await this.orderRepository.findById(orderId)
 
     if (!order) {
@@ -20,5 +21,7 @@ export class CancelOrderUseCase {
     order.cancel(cancelReason, this.clock.now())
 
     await this.orderRepository.save(order)
+
+    return order
   }
 }

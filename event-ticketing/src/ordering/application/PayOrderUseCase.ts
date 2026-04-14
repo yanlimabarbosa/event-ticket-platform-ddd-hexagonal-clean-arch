@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { OrderNotFound } from '../domain/errors/OrderNotFound'
 import { PaymentFailed } from '../domain/errors/PaymentFailed'
+import { Order } from '../domain/model/Order'
 import { Clock } from '../domain/ports/Clock'
 import { OrderRepository } from '../domain/ports/OrderRepository'
 import { PaymentGateway, type PaymentMethod } from '../domain/ports/PaymentGateway'
@@ -17,7 +18,7 @@ export class PayOrderUseCase {
     orderId: string,
     paymentToken: string,
     paymentMethod: PaymentMethod,
-  ): Promise<void> {
+  ): Promise<Order> {
     const order = await this.orderRepository.findById(orderId)
 
     if (!order) {
@@ -38,5 +39,7 @@ export class PayOrderUseCase {
     order.pay(this.clock.now())
 
     await this.orderRepository.save(order)
+
+    return order
   }
 }

@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common'
 import { CancelOrderUseCase } from './application/CancelOrderUseCase'
 import { CreateOrderUseCase } from './application/CreateOrderUseCase'
 import { ExpireOrderUseCase } from './application/ExpireOrderUseCase'
+import { ListAttendeeOrdersUseCase } from './application/ListAttendeeOrdersUseCase'
 import { PayOrderUseCase } from './application/PayOrderUseCase'
 import { Clock } from './domain/ports/Clock'
 import { EventAvailabilityChecker } from './domain/ports/EventAvailabilityChecker'
@@ -26,6 +27,7 @@ import { SystemClock } from './infrastructure/SystemClock'
     PayOrderUseCase,
     CancelOrderUseCase,
     ExpireOrderUseCase,
+    ListAttendeeOrdersUseCase,
     { provide: OrderRepository, useClass: MikroOrmOrderRepository },
     { provide: IdGenerator, useClass: CryptoIdGenerator },
     { provide: Clock, useClass: SystemClock },

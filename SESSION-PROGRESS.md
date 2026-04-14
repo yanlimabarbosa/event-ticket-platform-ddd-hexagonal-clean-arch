@@ -462,22 +462,62 @@ Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Doma
 - Installed `@oxc-node/core` for TS file support in MikroORM CLI
 - Updated all MikroORM packages from 7.0.8 to 7.0.10
 
-## What's Next
-4. ~~Phase 1.4~~ ✅
-5. ~~Phase 1.5~~ ✅
-6. ~~Phase 1.6~~ ✅
-7. **Phase 1.7** — Domain unit tests (deferred — will write after routes are working)
-8. ~~Phase 2.1~~ ✅ — All 4 use cases complete
-9. ~~Phase 3.1~~ ✅ — MikroORM entities
-10. ~~Phase 3.2~~ ✅ — Migrations
-11. ~~Phase 3.3~~ ✅ — Repository implementation (mapper + MikroORM adapter)
-12. ~~Phase 3.3 follow-ups~~ ✅ — Bidirectional mapper, abstract-class ports, IdGenerator + Clock + OrderNotFound, biome consolidation
-13. ~~Phase 3.4~~ ✅ — Fake adapters done (FakePaymentGateway + FakeEventAvailabilityChecker)
-14. **Phase 3.5** — HTTP controllers (3.5.1–3.5.5 done; `POST /orders` works end-to-end)
-    - 3.5.6 NEXT — remaining endpoints: `GET /orders?attendeeId=X`, `POST /orders/:id/pay`, `POST /orders/:id/cancel` + their DTOs + `ListAttendeeOrdersUseCase`
-15. **Phase 3.6** — Error handling (exception filters mapping `DomainError` → HTTP codes)
-16. **Phase 3.7** — NestJS module wiring (already done provisionally in 3.5.5; revisit if needed)
-17. **Phase 3.8** — Domain event publisher + transactional save (outbox pattern) — fixes remaining audit gaps
+## What's Next — Expanded Architect-Level Roadmap
+
+Goal: student becomes capable of designing and building distributed, event-driven systems at the architect level. One project, progressively harder layers.
+
+### Phase 3 — Finish the monolith (in progress)
+- ~~3.1~~ ✅ MikroORM entities
+- ~~3.2~~ ✅ Migrations
+- ~~3.3~~ ✅ Repository implementation + follow-ups (bidirectional mapper, abstract-class ports, IdGenerator, Clock, OrderNotFound, biome consolidation)
+- ~~3.4~~ ✅ Fake adapters (FakePaymentGateway, FakeEventAvailabilityChecker)
+- **Phase 3.5** — HTTP controllers (3.5.1–3.5.5 done; `POST /orders` works end-to-end)
+    - **3.5.6 NEXT** — remaining endpoints: `GET /orders?attendeeId=X`, `POST /orders/:id/pay`, `POST /orders/:id/cancel` + their DTOs + `ListAttendeeOrdersUseCase`
+- **3.6** — Exception filters mapping `DomainError` → HTTP status codes
+- **3.7** — Final NestJS module wiring review (mostly done)
+- **3.8** — Outbox pattern: `outbox_events` table, `DomainEventPublisher` port, `OutboxDomainEventPublisher` adapter, background worker polling & publishing via EventEmitter2. Closes audit item #1.
+
+### Phase 4 — Testing + second bounded context (events hands-on)
+- **4.1** Domain unit tests (aggregates, value objects, business rules)
+- **4.2** Integration tests hitting real PostgreSQL (testcontainers or in-memory SQLite)
+- **4.3** **Check-in bounded context** — NEW NestJS module: `Ticket` aggregate, listens to `OrderPaid` events from Ordering, creates tickets. First time you see events flow BETWEEN contexts with your own eyes.
+- **4.4** **Swap EventEmitter2 for RabbitMQ** — real message broker via Docker. Add management UI (port 15672) so you can SEE messages flow. First hands-on broker experience.
+- **4.5** **Inbox pattern in Check-in** — consumer-side dedup table. At-least-once delivery + inbox = exactly-once processing. Only makes sense once you have a real broker.
+
+### Phase 5 — Microservices split + production concerns
+- **5.1** Split Check-in into its own NestJS app with its own DB. `docker-compose.yml` with 4 containers: postgres-ordering, postgres-checkin, rabbitmq, ordering-app, checkin-app. First real microservices deployment.
+- **5.2** Real `StripePaymentGateway` adapter — swap the fake, Stripe test mode with webhooks. Portfolio-grade integration.
+- **5.3** Observability — structured JSON logging via Pino, correlation IDs propagated through HTTP headers and event metadata, basic Prometheus metrics.
+- **5.4** Resilience patterns — retry with exponential backoff on PaymentGateway, circuit breaker on EventAvailabilityChecker, timeouts on all external calls.
+
+### Phase 6 — Scale-out reads
+- **6.1** CQRS — split commands and queries, dedicated read models for list endpoints.
+- **6.2** Redis cache for `GET /orders/:id` with TTL + invalidation on domain events.
+- **6.3** Pagination, filtering, sorting on list endpoints.
+
+### Phase 7 — Stretch / architect-tier
+- **7.1** Event sourcing for the Order aggregate — events ARE the source of truth; state is projected from events. Compare trade-offs vs state-based approach.
+- **7.2** Saga pattern — distributed transaction across Ordering + Check-in when an order is created and tickets must be pre-reserved atomically.
+- **7.3** Write a teardown doc: what the student learned, trade-offs, when to use each pattern in the wild.
+
+### Time estimate (honest)
+- Phase 3.5–3.8: ~1 week
+- Phase 4: ~3 weeks
+- Phase 5: ~3 weeks
+- Phase 6: ~2 weeks
+- Phase 7: ~2 weeks
+- **Total: ~10–12 weeks of focused work to architect-level**
+
+### Why this roadmap takes you to architect-level
+Diagrams and articles teach vocabulary; hands-on experience teaches judgment. By Phase 5 the student will have:
+- Built a full monolith with DDD + Hexagonal + Clean Architecture ✅
+- Seen events flow between bounded contexts in-process and via a real broker ✅
+- Split a monolith into microservices with a real message bus ✅
+- Implemented outbox + inbox for crash-safe exactly-once messaging ✅
+- Integrated a real external API (Stripe) with webhooks ✅
+- Shipped observability and resilience patterns used in real production systems ✅
+
+This is roughly the skill set expected of a mid-to-senior backend engineer in Brazil. Phases 6–7 push toward senior/architect.
 
 ## Architectural Decisions
 

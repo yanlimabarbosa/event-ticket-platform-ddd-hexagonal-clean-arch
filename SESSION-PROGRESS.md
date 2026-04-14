@@ -2,7 +2,12 @@
 
 ## Current Phase: 3.4 — External Service Adapters (next)
 
-Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Domain layer fully built. Application layer complete (all 4 use cases). Infrastructure: entities, migrations, mapper, and repository done.
+Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Domain layer fully built. Application layer complete (all 4 use cases). Infrastructure: entities, migrations, mapper, and repository done. Ports refactored to abstract classes; `IdGenerator`, `Clock` ports + adapters added. `OrderNotFound` domain error replaces NestJS `NotFoundException` in use cases. Biome configs consolidated.
+
+## Known Gaps (to revisit)
+
+- **Domain events are recorded but never published.** Use cases call `order.pay()` etc. (which records events) and then call `save()`, but nobody calls `pullDomainEvents()`. Fix later: add a `DomainEventPublisher` port + an EventEmitter2 adapter; drain events after save. Best done after Phase 3.7 module wiring.
+- **`save()` doesn't wrap in an explicit transaction.** MikroORM's implicit flush is usually enough, but `em.transactional()` is safer. Pair with the domain events fix above (outbox pattern needs both).
 
 ## Completed Phases
 
@@ -274,6 +279,99 @@ Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Doma
   - `?` in TS means `T | undefined`, `| null` means `T | null` — DB nulls should use `| null`
   - Student wants to write code himself — mentor should give structure/hints, not full implementations
 
+### Phase 3.3 follow-up — Mapper refactor (toPersistence + applyStateChanges)
+- Problem identified by student: `OrderMapper` only had `toDomain()`. Domain→entity mapping was inlined in `MikroOrmOrderRepository.save()` (30 lines, `domainToEnum` map duplicated between repo and mapper).
+- Refactor: added `OrderMapper.toPersistence(order): RequiredEntityData<OrderEntity>` for inserts, and `OrderMapper.applyStateChanges(entity, order): void` for updates.
+- Repository `save()` shrunk from ~30 lines to 8 lines. Both status conversion maps (`enumToDomain`, `domainToEnum`) now live together in the mapper.
+- Used `import type { OrderEntity }` split from `import { OrderStatusEnum }` — enum is a runtime value, entity is a type-only import.
+- Key lessons learned:
+  - "Unit of Work handles persistence" means MikroORM handles the SQL, NOT the domain→ORM translation. That translation always has to happen somewhere.
+  - `applyStateChanges` only touches mutable fields (status, total, paid_at, cancelled_at, cancel_reason). Immutable fields never change after creation — mirrors the domain.
+  - `RequiredEntityData<OrderEntity>` is MikroORM's type for "the plain data shape needed by `em.create`" — handles `Collection<T>` → array conversion automatically.
+  - Half-finished refactors (port created, old code still called) are the most common kind in the wild. Always grep for the old call after introducing a replacement.
+
+### Phase 3.3 follow-up — IdGenerator port + adapter
+- Problem: `CreateOrderUseCase` called `crypto.randomUUID()` inline — non-deterministic, hard to test.
+- Created `IdGenerator` port in `domain/ports/` with single `generate(): string` method.
+- Created `CryptoIdGenerator` adapter in `infrastructure/` using `node:crypto` `randomUUID()`. `@Injectable()`, extends (not implements) the abstract port.
+- Wired into `CreateOrderUseCase` constructor — both `Order` and `OrderItem` IDs now come from `this.idGenerator.generate()`.
+- Key lessons learned:
+  - Non-deterministic calls (`crypto.randomUUID`, `new Date()`) are infrastructure by definition — they produce side effects. Keep them behind ports.
+  - One shared `IdGenerator` port is fine for all aggregates/entities — don't split into `OrderIdGenerator` + `OrderItemIdGenerator`. They want the same string.
+  - Common mistake: `new randomUUID()` — `randomUUID` is a function, not a class. `new` only applies to constructors. TS strict mode catches this.
+  - `new Date()` inside `Order.create()` is a second hidden dependency — a `Clock` port would let tests freeze time. Deferred for now.
+
+### Phase 3.3 follow-up — Abstract classes for all ports (major architectural refactor)
+- Problem: TypeScript interfaces are erased at compile time. NestJS DI has no runtime type to resolve against, forcing `@Inject('string-token')` — ugly, stringly-typed, easy to typo silently.
+- Refactor: converted all 4 Ordering ports from `interface` to `abstract class`:
+  - `IdGenerator`, `OrderRepository`, `PaymentGateway`, `EventAvailabilityChecker`
+- Adapters switched from `implements` to `extends` (with `super()` in constructors where applicable) and use `public override` on every method.
+- Use cases now inject ports by type alone — **no `@Inject()` decorators needed** because abstract classes survive compilation as real JS classes (valid runtime DI tokens).
+- Module wiring (future Phase 3.7) uses the class itself as the token: `{ provide: OrderRepository, useClass: MikroOrmOrderRepository }`.
+- Changed port imports in use cases from `import type {...}` to `import {...}` — abstract classes are runtime values, not just types.
+- Key lessons learned:
+  - **NestJS DI is a `Map<token, implementation>`.** Tokens are runtime values. Interfaces can't be tokens because they vanish at compile time. Classes survive, so they CAN be tokens. Abstract classes are still classes.
+  - Decision rule: concrete class → NestJS resolves by type automatically. Abstract class → NestJS resolves by class-as-token (type-only injection works). Interface → must use `@Inject('string')` and is stringly-typed.
+  - `public override` (explicit modifiers rule) gives you TS safety: if the parent method is renamed, children break at compile time. `implements` gives weaker guarantees — a renamed interface method silently becomes a NEW method on the implementer.
+  - The `super()` call in constructors that extend abstract classes is required — Java enforces the same rule.
+  - This is the **NestJS-idiomatic** pattern for ports — the framework docs themselves recommend abstract classes for this reason.
+
+### Cross-cutting learning — TypeScript vs Java for DDD/OOP (conclusion reached this session)
+- Student hit the wall with TS's type erasure during DI wiring and explicitly concluded: **will migrate to Java/Spring Boot after this project**.
+- Why Java is genuinely better for DDD/OOP:
+  - **Reflection & reified types.** Java interfaces survive as runtime `Class<?>` objects. Spring can do `applicationContext.getBean(OrderRepository.class)` — no token dance, no abstract-class workaround. The "interface is the idiomatic port shape" in Java and 90% of Spring codebases use interfaces for ports.
+  - **Real access modifiers.** `private` is a JVM guarantee. In TS it's a lint rule — `(order as any).status = 'paid'` bypasses it and ruins aggregate invariants. For DDD where invariants matter, this is significant.
+  - **Nominal typing.** Java types match by name. TS structural typing means `{ id: string }` accidentally satisfies your `Entity` type. Nominal typing is safer for DDD.
+  - **Real enums.** Java enums are classes with methods. TS enums are a mess and most teams avoid them.
+  - **Stable decorator spec.** `@Injectable` `@Entity` sit on years-long "stage 2/3" proposals in JS.
+- Java/Kotlin job-market take:
+  - **Java dominates.** ~10x more jobs than Kotlin backend — Brazil and abroad. Banks, insurance, e-commerce, enterprise.
+  - **Kotlin is not mobile-only.** General-purpose JVM, used for backend at Netflix/Uber/Pinterest/Square. Nordic fintech likes it. But still a much smaller job pool.
+  - **Strategy:** learn Java + Spring Boot first (hireable skill), add Kotlin later as a differentiator. Most "Kotlin jobs" accept Java devs; few "Java jobs" require Kotlin.
+  - **Export package for Brazilian devs abroad:** English + Java + Spring + DDD + cloud (AWS/GCP) + Kubernetes.
+- Architectural patterns learned in TS transfer 1:1 to Java — the hard part is domain modeling, not the language. Nothing wasted.
+
+### Phase 3.3 follow-up — OrderNotFound domain error
+- Problem: `PayOrderUseCase`, `ExpireOrderUseCase`, `CancelOrderUseCase` were throwing NestJS `NotFoundException` from the application layer — HTTP infrastructure leaking into the use-case layer (hexagonal violation).
+- Created `OrderNotFound` domain error in `src/ordering/domain/errors/OrderNotFound.ts` extending `DomainError`, takes order id in constructor.
+- Replaced all 3 `throw new NotFoundException()` calls with `throw new OrderNotFound(orderId)`.
+- Removed `NotFoundException` imports from use cases.
+- Future Phase 3.6 exception filter will map `OrderNotFound` → HTTP 404.
+- Key lessons learned:
+  - Application layer should throw domain errors only — HTTP exceptions belong in controllers/filters.
+  - One domain error class per business situation. `OrderNotFound(id)` is more expressive than `Error('not found')`.
+  - The `DomainError` base class lets a single exception filter catch all business errors with one `instanceof DomainError` check.
+
+### Phase 3.3 follow-up — Clock port and SystemClock adapter
+- Problem: `Order.create()`, `Order.pay()`, `Order.cancel()` all called `new Date()` directly. Non-deterministic, hard to test (can't freeze time without globally mocking Date).
+- Created `Clock` abstract class port in `domain/ports/Clock.ts` with `now(): Date`.
+- Created `SystemClock` adapter in `infrastructure/SystemClock.ts` using `new Date()`. `@Injectable`, `extends Clock`, `public override now()`.
+- Refactored `Order`:
+  - Extracted `RESERVATION_WINDOW_MS = 15 * 60 * 1000` as private static readonly constant (no more magic number).
+  - `Order.create(id, eventId, attendeeId, items, now: Date)` — takes `now`, computes `expiresAt = now + RESERVATION_WINDOW_MS` internally (the "+15 min" rule stays in the domain).
+  - `Order.pay(now: Date)` — takes `now` for `paidAt`.
+  - `Order.cancel(reason, now: Date)` — takes `now` for `cancelledAt`.
+  - `Order.expire()` unchanged (no timestamp recorded).
+- Use cases (`CreateOrderUseCase`, `PayOrderUseCase`, `CancelOrderUseCase`) now inject `Clock` and pass `this.clock.now()` to aggregate methods.
+- Key lessons learned:
+  - **Functional core, imperative shell** — aggregates take pure values (Date), not service interfaces (Clock). Use case orchestrates the Clock.
+  - Alternative was inject-Clock into the aggregate constructor — rejected because it pollutes the mapper (would need Clock to reconstruct from DB) and every test (custom FakeClock helper).
+  - Aggregates should be reconstructable from pure data — the row in the DB has all the dates already; rebuilding shouldn't require a service.
+  - Inject-Clock has one strong case: batch consistency (1000 aggregates sharing same `now`). Solve in pass-Date by capturing `const now = this.clock.now()` once at top of use case and reusing.
+  - Magic numbers (`15 * 60 * 1000`) should become named constants — this one is a real domain rule (reservation window length).
+
+### Phase 3.3 follow-up — Biome config consolidation
+- Problem: two `biome.json` files (workspace root + `event-ticketing/`) were drifting. VS Code LSP picked up the workspace root config, CLI from event-ticketing folder picked up the inner one. Edits in one were ignored by the other.
+- Inner `event-ticketing/biome.json` deleted. Workspace root `biome.json` is now the single source of truth.
+- Workspace root config updated:
+  - Disabled `style.useImportType` rule — was auto-converting NestJS DI imports to `import type`, breaking runtime DI (abstract classes are erased when imported as types).
+  - Added `!event-ticketing/src/migrations/**` to file excludes — MikroORM auto-generates a snapshot JSON file that fails Biome's formatter rules (multi-line vs single-line arrays).
+- Reformatted `OrderEntity.ts` to match Biome's preferences.
+- Key lessons learned:
+  - Biome's config discovery walks up from each file's location and stops at the first `biome.json` it finds. Two configs = two sources of truth = drift.
+  - Biome `useImportType` is a trap for NestJS projects: it converts class imports used only in type annotations to `import type`, but `emitDecoratorMetadata` needs them as runtime values for DI to work.
+  - LSP configuration is cached in memory — after editing `biome.json`/`tsconfig.json`/`eslint.config.js`, restart the LSP or reload the editor window.
+
 ### Tooling updates
 - Added Biome nursery rules: `noFloatingPromises` (error), `useExplicitType` (error)
 - Fixed VS Code import sorting on save: added `source.fixAll.biome` to codeActionsOnSave
@@ -294,10 +392,12 @@ Phases 0, 1.1–1.6 complete. Phase 1.7 (tests) deferred until routes work. Doma
 9. ~~Phase 3.1~~ ✅ — MikroORM entities
 10. ~~Phase 3.2~~ ✅ — Migrations
 11. ~~Phase 3.3~~ ✅ — Repository implementation (mapper + MikroORM adapter)
-12. **Phase 3.4** — External service adapters (fake payment gateway, event availability)
-13. **Phase 3.5** — HTTP controllers
-14. **Phase 3.6** — Error handling (exception filters)
-15. **Phase 3.7** — NestJS module wiring
+12. ~~Phase 3.3 follow-ups~~ ✅ — Bidirectional mapper, abstract-class ports, IdGenerator + Clock + OrderNotFound, biome consolidation
+13. **Phase 3.4** — External service adapters (FakePaymentGateway, FakeEventAvailabilityChecker) — NEXT
+14. **Phase 3.5** — HTTP controllers
+15. **Phase 3.6** — Error handling (exception filters)
+16. **Phase 3.7** — NestJS module wiring
+17. **Phase 3.8** — Domain event publisher + transactional save (outbox pattern) — fixes remaining audit gaps
 
 ## Architectural Decisions
 

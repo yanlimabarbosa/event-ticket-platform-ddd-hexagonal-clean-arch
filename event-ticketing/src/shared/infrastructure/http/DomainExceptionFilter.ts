@@ -1,9 +1,9 @@
 import { type ArgumentsHost, Catch, type ExceptionFilter, Logger } from '@nestjs/common'
 import type { Response } from 'express'
-import { ConflictError } from '../../domain/ConflictError'
-import { DomainError } from '../../domain/DomainError'
-import { NotFoundError } from '../../domain/NotFoundError'
-import { ValidationError } from '../../domain/ValidationError'
+import { ConflictError } from '../../domain/errors/ConflictError'
+import { DomainError } from '../../domain/errors/DomainError'
+import { NotFoundError } from '../../domain/errors/NotFoundError'
+import { ValidationError } from '../../domain/errors/ValidationError'
 
 const DEFAULT_STATUS = 409
 

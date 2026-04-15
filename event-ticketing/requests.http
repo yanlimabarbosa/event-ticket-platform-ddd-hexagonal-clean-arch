@@ -38,8 +38,8 @@ Content-Type: {{contentType}}
 GET {{baseUrl}}/orders?attendeeId={{attendeeId}}
 
 
-### 3. Pay the order created above — 200 OK
-# Captures the id from request #1's response
+### 3. Pay the order from #1 — 200 OK
+# Uses the id captured from request #1
 @orderId = {{createOrder.response.body.id}}
 
 POST {{baseUrl}}/orders/{{orderId}}/pay
@@ -51,7 +51,7 @@ Content-Type: {{contentType}}
 }
 
 
-### 4. Cancel a freshly reserved order (run #1 again first to get a new id)
+### 4. Setup — create a fresh order so the next request can cancel it
 # @name createForCancel
 POST {{baseUrl}}/orders
 Content-Type: {{contentType}}
@@ -65,7 +65,7 @@ Content-Type: {{contentType}}
 }
 
 
-### 5. Cancel with a reason — 200 OK
+### 5. Cancel the order from #4 with a reason — 200 OK
 POST {{baseUrl}}/orders/{{createForCancel.response.body.id}}/cancel
 Content-Type: {{contentType}}
 
@@ -74,8 +74,7 @@ Content-Type: {{contentType}}
 }
 
 
-### 6. Cancel without a reason (tests the `?? null` boundary) — 200 OK
-# Create another order first
+### 6. Setup — create another fresh order to test cancel without a reason
 # @name createForCancelNoReason
 POST {{baseUrl}}/orders
 Content-Type: {{contentType}}
@@ -89,7 +88,7 @@ Content-Type: {{contentType}}
 }
 
 
-### 7. Cancel it with an empty body — 200 OK, reason should end up null
+### 7. Cancel the order from #6 with an empty body — 200 OK, reason ends up null
 POST {{baseUrl}}/orders/{{createForCancelNoReason.response.body.id}}/cancel
 Content-Type: {{contentType}}
 
@@ -101,7 +100,7 @@ Content-Type: {{contentType}}
 ###############################################################################
 
 
-### 8. Event is closed for sales — should throw EventNotAvailable
+### 8. Create an order for a closed event — 409 EventNotAvailable
 POST {{baseUrl}}/orders
 Content-Type: {{contentType}}
 
@@ -114,7 +113,7 @@ Content-Type: {{contentType}}
 }
 
 
-### 9. Ticket sold out — should throw InsufficientTickets
+### 9. Create an order for a sold-out ticket — 409 InsufficientTickets
 POST {{baseUrl}}/orders
 Content-Type: {{contentType}}
 
@@ -127,7 +126,7 @@ Content-Type: {{contentType}}
 }
 
 
-### 10. Payment fails deterministically — token starting with "fail-"
+### 10. Setup — create a fresh order to fail its payment next
 # @name createForFailedPayment
 POST {{baseUrl}}/orders
 Content-Type: {{contentType}}
@@ -141,7 +140,8 @@ Content-Type: {{contentType}}
 }
 
 
-### 11. Try to pay with a failing token — should throw PaymentFailed
+### 11. Pay the order from #10 with a failing token — 409 PaymentFailed
+# Any token starting with "fail-" triggers deterministic failure in FakePaymentGateway
 POST {{baseUrl}}/orders/{{createForFailedPayment.response.body.id}}/pay
 Content-Type: {{contentType}}
 
@@ -151,7 +151,7 @@ Content-Type: {{contentType}}
 }
 
 
-### 12. Pay a non-existent order — should throw OrderNotFound
+### 12. Pay a non-existent order — 404 OrderNotFound
 POST {{baseUrl}}/orders/00000000-0000-0000-0000-000000000000/pay
 Content-Type: {{contentType}}
 
@@ -161,7 +161,7 @@ Content-Type: {{contentType}}
 }
 
 
-### 13. Validation — empty items array (DTO @ArrayMinSize) — 400 Bad Request
+### 13. Create an order with empty items array — 400 Bad Request (DTO @ArrayMinSize)
 POST {{baseUrl}}/orders
 Content-Type: {{contentType}}
 
@@ -172,7 +172,7 @@ Content-Type: {{contentType}}
 }
 
 
-### 14. Validation — extra property (DTO forbidNonWhitelisted) — 400 Bad Request
+### 14. Create an order with an extra property — 400 Bad Request (DTO forbidNonWhitelisted)
 POST {{baseUrl}}/orders
 Content-Type: {{contentType}}
 
@@ -186,8 +186,8 @@ Content-Type: {{contentType}}
 }
 
 
-### 15. Validation — invalid payment method (DTO @IsIn) — 400 Bad Request
-# Needs an existing order id; reuse #1 or create fresh
+### 15. Pay with an invalid payment method — 400 Bad Request (DTO @IsIn)
+# Reuses the order id from #1
 POST {{baseUrl}}/orders/{{createOrder.response.body.id}}/pay
 Content-Type: {{contentType}}
 

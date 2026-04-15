@@ -13,6 +13,8 @@ This project follows **DDD + Hexagonal + Clean Architecture** with **NestJS**, *
 
 - **LANGUAGES-FOR-DDD.md** — Deep comparison of Python, JavaScript/TypeScript, Java, and Go for OOP and DDD. Reference for language-choice questions and the rationale behind the planned migration to Java/Spring Boot after this project.
 
+- **HEXAGONAL-AND-CLEAN.md** — Reference guide to Cockburn's Hexagonal Architecture and Uncle Bob's Clean Architecture principles, with the exact rules governing this project's folder structure (where in/out lives, why domain has no ports, dependency rule). Read this when questioning any architectural decision.
+
 ## Session Continuity — CRITICAL
 
 - **SESSION-PROGRESS.md** — Current phase, completed phases with key lessons, student profile, and what's next.

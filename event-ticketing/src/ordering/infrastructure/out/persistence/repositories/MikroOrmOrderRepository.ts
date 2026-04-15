@@ -1,13 +1,16 @@
 import { EntityManager } from '@mikro-orm/postgresql'
 import { Injectable } from '@nestjs/common'
-import type { Order } from '../domain/model/Order'
-import { OrderRepository } from '../domain/ports/OrderRepository'
-import { OrderEntity } from './OrderEntity'
-import { OrderMapper } from './OrderMapper'
+import type { Order } from '../../../../domain/entities/Order'
+import { OrderRepository } from '../../../../application/ports/out/OrderRepository'
+import { OrderEntity } from '../entities/OrderEntity'
+import { OrderMapper } from '../mappers/OrderMapper'
 
 @Injectable()
 export class MikroOrmOrderRepository extends OrderRepository {
-  public constructor(private readonly em: EntityManager) {
+  public constructor(
+    private readonly em: EntityManager,
+    private readonly mapper: OrderMapper,
+  ) {
     super()
   }
 
@@ -16,9 +19,9 @@ export class MikroOrmOrderRepository extends OrderRepository {
       const existing = await em.findOne(OrderEntity, { id: order.id })
 
       if (existing) {
-        OrderMapper.applyStateChanges(existing, order)
+        this.mapper.applyStateChanges(existing, order)
       } else {
-        em.create(OrderEntity, OrderMapper.toPersistence(order))
+        em.create(OrderEntity, this.mapper.toPersistence(order))
       }
     })
   }
@@ -30,7 +33,7 @@ export class MikroOrmOrderRepository extends OrderRepository {
       return null
     }
 
-    return OrderMapper.toDomain(order)
+    return this.mapper.toDomain(order)
   }
 
   public override async findByAttendeeId(attendeeId: string): Promise<Order[]> {
@@ -40,6 +43,6 @@ export class MikroOrmOrderRepository extends OrderRepository {
       { populate: ['items'] },
     )
 
-    return orders.map((entity) => OrderMapper.toDomain(entity))
+    return orders.map((entity) => this.mapper.toDomain(entity))
   }
 }

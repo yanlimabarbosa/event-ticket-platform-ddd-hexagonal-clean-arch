@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { EventAvailabilityChecker } from '../domain/ports/EventAvailabilityChecker'
+import { EventAvailabilityChecker } from '../../../application/ports/out/EventAvailabilityChecker'
 
 @Injectable()
 export class FakeEventAvailabilityChecker extends EventAvailabilityChecker {

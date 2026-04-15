@@ -1,5 +1,5 @@
 import { IsIn, IsNotEmpty, IsString } from 'class-validator'
-import type { PaymentMethod } from '../../../domain/ports/PaymentGateway'
+import type { PaymentMethod } from '../../../../../application/ports/out/PaymentGateway'
 
 const PAYMENT_METHODS: PaymentMethod[] = ['credit_card', 'pix', 'boleto']
 

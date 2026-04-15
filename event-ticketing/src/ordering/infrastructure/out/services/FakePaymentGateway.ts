@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { PaymentGateway, PaymentMethod } from '../domain/ports/PaymentGateway'
+import { PaymentGateway, PaymentMethod } from '../../../application/ports/out/PaymentGateway'
 
 @Injectable()
 export class FakePaymentGateway extends PaymentGateway {

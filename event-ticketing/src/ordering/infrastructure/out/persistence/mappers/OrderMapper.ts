@@ -1,11 +1,12 @@
 import type { RequiredEntityData } from '@mikro-orm/core'
-import { Money } from '../domain/model/Money'
-import { Order } from '../domain/model/Order'
-import { OrderItem } from '../domain/model/OrderItem'
-import { OrderStatus } from '../domain/model/OrderStatus'
-import { Quantity } from '../domain/model/Quantity'
-import type { OrderEntity } from './OrderEntity'
-import { OrderStatusEnum } from './OrderEntity'
+import { Injectable } from '@nestjs/common'
+import { Order } from '../../../../domain/entities/Order'
+import { OrderItem } from '../../../../domain/entities/OrderItem'
+import { Money } from '../../../../domain/value-objects/Money'
+import { OrderStatus } from '../../../../domain/value-objects/OrderStatus'
+import { Quantity } from '../../../../domain/value-objects/Quantity'
+import type { OrderEntity } from '../entities/OrderEntity'
+import { OrderStatusEnum } from '../entities/OrderEntity'
 
 const enumToDomain: Record<OrderStatusEnum, OrderStatus> = {
   [OrderStatusEnum.RESERVED]: OrderStatus.reserved(),
@@ -21,9 +22,9 @@ const domainToEnum: Record<string, OrderStatusEnum> = {
   cancelled: OrderStatusEnum.CANCELLED,
 }
 
-// biome-ignore lint/complexity/noStaticOnlyClass: Mapper pattern
+@Injectable()
 export class OrderMapper {
-  public static toDomain(entity: OrderEntity): Order {
+  public toDomain(entity: OrderEntity): Order {
     const items = entity.items
       .getItems()
       .map(
@@ -50,7 +51,7 @@ export class OrderMapper {
     )
   }
 
-  public static toPersistence(order: Order): RequiredEntityData<OrderEntity> {
+  public toPersistence(order: Order): RequiredEntityData<OrderEntity> {
     return {
       id: order.id,
       event_id: order.getEventId(),
@@ -71,7 +72,7 @@ export class OrderMapper {
     }
   }
 
-  public static applyStateChanges(entity: OrderEntity, order: Order): void {
+  public applyStateChanges(entity: OrderEntity, order: Order): void {
     entity.status = domainToEnum[order.getStatus().getValue()]
     entity.total = order.getTotal().getValue()
     entity.paid_at = order.getPaidAt()

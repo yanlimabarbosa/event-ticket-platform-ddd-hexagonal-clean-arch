@@ -1,4 +1,4 @@
-import { DomainEvent } from 'src/shared/domain/DomainEvent'
+import { DomainEvent } from 'src/shared/domain/base/DomainEvent'
 
 export class OrderExpired extends DomainEvent {
   public constructor(

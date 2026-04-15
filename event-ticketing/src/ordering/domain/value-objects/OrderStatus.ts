@@ -1,4 +1,4 @@
-import { ValueObject } from 'src/shared/domain/ValueObject'
+import { ValueObject } from 'src/shared/domain/base/ValueObject'
 import { InvalidOrderTransition } from '../errors/InvalidOrderTransition'
 
 export type OrderStatusType = 'reserved' | 'paid' | 'expired' | 'cancelled'
@@ -46,7 +46,7 @@ export class OrderStatus extends ValueObject {
   }
 
   public toCancelled(): OrderStatus {
-    if (this.value !== 'paid') {
+    if (this.value !== 'reserved' && this.value !== 'paid') {
       throw new InvalidOrderTransition(this.value, 'cancelled')
     }
 

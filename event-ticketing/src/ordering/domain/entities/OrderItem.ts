@@ -1,6 +1,6 @@
-import { Entity } from 'src/shared/domain/Entity'
-import { Money } from './Money'
-import type { Quantity } from './Quantity'
+import { Entity } from 'src/shared/domain/base/Entity'
+import { Money } from '../value-objects/Money'
+import type { Quantity } from '../value-objects/Quantity'
 
 export class OrderItem extends Entity {
   public constructor(

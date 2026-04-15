@@ -1,4 +1,4 @@
-import { NotFoundError } from 'src/shared/domain/NotFoundError'
+import { NotFoundError } from 'src/shared/domain/errors/NotFoundError'
 
 export class OrderNotFound extends NotFoundError {
   public constructor(id: string) {

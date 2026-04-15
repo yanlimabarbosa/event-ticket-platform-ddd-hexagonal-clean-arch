@@ -1,4 +1,4 @@
-import { ValidationError } from 'src/shared/domain/ValidationError'
+import { ValidationError } from 'src/shared/domain/errors/ValidationError'
 
 export class InvalidMoney extends ValidationError {
   public constructor(value: number) {

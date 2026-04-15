@@ -1,12 +1,12 @@
-import { AggregateRoot } from 'src/shared/domain/AggregateRoot'
+import { AggregateRoot } from 'src/shared/domain/base/AggregateRoot'
 import { EmptyOrderItem } from '../errors/EmptyOrderItem'
 import { OrderCancelled } from '../events/OrderCancelled'
 import { OrderCreated } from '../events/OrderCreated'
 import { OrderExpired } from '../events/OrderExpired'
 import { OrderPaid } from '../events/OrderPaid'
-import { Money } from './Money'
+import { Money } from '../value-objects/Money'
+import { OrderStatus } from '../value-objects/OrderStatus'
 import type { OrderItem } from './OrderItem'
-import { OrderStatus } from './OrderStatus'
 
 export class Order extends AggregateRoot {
   public constructor(

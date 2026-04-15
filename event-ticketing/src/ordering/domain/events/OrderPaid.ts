@@ -1,4 +1,4 @@
-import { DomainEvent } from 'src/shared/domain/DomainEvent'
+import { DomainEvent } from 'src/shared/domain/base/DomainEvent'
 
 type OrderPaidItems = { ticketTypeId: string; quantity: number }[]
 

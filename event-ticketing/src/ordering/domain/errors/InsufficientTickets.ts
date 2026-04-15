@@ -1,4 +1,4 @@
-import { ConflictError } from 'src/shared/domain/ConflictError'
+import { ConflictError } from 'src/shared/domain/errors/ConflictError'
 
 export class InsufficientTickets extends ConflictError {
   public constructor(ticketTypeId: string) {

@@ -1,4 +1,4 @@
-import { ValueObject } from 'src/shared/domain/ValueObject'
+import { ValueObject } from 'src/shared/domain/base/ValueObject'
 import { InvalidMoney } from '../errors/InvalidMoney'
 
 export class Money extends ValueObject {

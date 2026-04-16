@@ -48,6 +48,9 @@ Ordering bounded context is fully functional end-to-end:
 4. Always use production tools (PostgreSQL + Docker, not SQLite)
 5. Always write explicit access modifiers (public/private/protected), override, and return types
 6. Let the student explore questions at their own pace — don't rush to next task
+7. **Explain every new pattern with ASCII diagrams** — show: database table state (before/after), request flow with arrows, side-by-side concurrent operations, exact SQL generated, and the difference the pattern makes. This is the preferred explanation style. Don't just describe in text.
+8. Don't move to next topic until current one is fully understood and discussed
+9. **Always teach incrementally: flow → problem → pattern** — first make the naive version work, then demonstrate the failure visually (logs, DB state, crash simulation), then introduce the pattern as the fix, then implement. Never jump straight to a pattern without showing why it's needed first.
 
 ## Project Structure
 

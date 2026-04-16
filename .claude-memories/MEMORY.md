@@ -6,3 +6,4 @@
 - [Don't push](feedback_dont_push.md) — Let the student explore questions at their own pace, don't rush to next task
 - [Let student code](feedback_let_student_code.md) — Give hints and structure, don't write full implementations
 - [Java migration](project_java_migration.md) — Student will migrate to Java + Spring after this project; prefer Java-transferable patterns
+- [Visual and incremental](feedback_visual_and_incremental.md) — ASCII diagrams for every pattern + always show flow → problem → pattern fix

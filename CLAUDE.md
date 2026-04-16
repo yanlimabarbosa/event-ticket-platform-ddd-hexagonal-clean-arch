@@ -1,66 +1,70 @@
-# Project Guide
+# Event Ticketing Platform — DDD + Hexagonal + Clean Architecture
 
-This project follows **DDD + Hexagonal + Clean Architecture** with **NestJS**, **MikroORM**, and **TypeScript**.
+**Stack:** NestJS 11 · MikroORM 7 · PostgreSQL 16 · TypeScript (strict) · Docker · Biome · pnpm
+
+## Current State
+
+**Phase 3.7** — Module wiring review complete. Next: **Phase 3.8 (Outbox pattern)**.
+
+Ordering bounded context is fully functional end-to-end:
+- 5 use cases: CreateOrder, PayOrder, CancelOrder, ExpireOrder, ListAttendeeOrders
+- 4 HTTP endpoints: POST /orders, GET /orders?attendeeId, POST /orders/:id/pay, POST /orders/:id/cancel
+- Domain layer: Order aggregate, OrderItem entity, 3 value objects (Money, Quantity, OrderStatus), 4 domain events, 8 domain errors
+- Infrastructure: MikroORM persistence, mapper (toDomain/toPersistence/applyStateChanges), global DomainExceptionFilter
+- All ports are abstract classes (NestJS DI without @Inject tokens)
+- Fake adapters for PaymentGateway and EventAvailabilityChecker
 
 ## Reference Files
 
-@TECHNICAL.md
-@TEACH-ME.md
+- **DOMAIN.md** — Ubiquitous language, bounded contexts, aggregate mapping, invariants, domain events, DB schema, API design
+- **TECHNICAL.md** — Architecture rules, folder structure, layer rules, patterns, anti-patterns. Use as base reference, not law — apply real industry practices when they diverge.
+- **SESSION-PROGRESS.md** — Detailed phase history, deferred patterns, known gaps, roadmap
 
-- **TECHNICAL.md** — A starting reference for architecture patterns. **NOT law** — use it as a base but always apply real industry best practices. If TECHNICAL.md says one thing but industry practice says another, go with industry practice and explain why.
+## Key Architectural Decisions
 
-- **TEACH-ME.md** — The teaching methodology. Defines HOW to teach: the learning loop, phases 0-4 progression, challenge difficulty curve, and mentoring rules.
+- **Ports as abstract classes** — not interfaces. TS interfaces are erased at compile time; abstract classes survive as valid NestJS DI tokens.
+- **Three layers of validation:** DTO format → use case preconditions → domain invariants
+- **Marker parent error classes** (NotFoundError, ConflictError, ValidationError) for HTTP status mapping in DomainExceptionFilter
+- **Money as integer cents** everywhere — DB column is `integer`, not `numeric`/`decimal`
+- **Domain events recorded but not published yet** — Phase 3.8 adds outbox pattern
+- **No CQRS yet** — use cases are plain @Injectable classes. CQRS refactor in Phase 7.
 
-- **LANGUAGES-FOR-DDD.md** — Deep comparison of Python, JavaScript/TypeScript, Java, and Go for OOP and DDD. Reference for language-choice questions and the rationale behind the planned migration to Java/Spring Boot after this project.
+## Known Gaps
 
-- **HEXAGONAL-AND-CLEAN.md** — Reference guide to Cockburn's Hexagonal Architecture and Uncle Bob's Clean Architecture principles, with the exact rules governing this project's folder structure (where in/out lives, why domain has no ports, dependency rule). Read this when questioning any architectural decision.
+- Domain events never published (Phase 3.8)
+- No automated order expiration scheduler (ExpireOrderUseCase exists, no cron)
+- IDOR vulnerability: attendeeId from client input, not auth token (Phase 5.0)
+- No tests yet (Phase 4)
 
-## Session Continuity — CRITICAL
+## Ignored Folders
 
-- **SESSION-PROGRESS.md** — Current phase, completed phases with key lessons, student profile, and what's next.
+- **`.claude-ignore/`** — archived docs (old theory references, deprecated teaching methodology). Never read or reference these files.
 
-### Rules for every session:
-1. **At the start of every new session:** Read `SESSION-PROGRESS.md` FIRST to understand where we left off. Resume from the exact phase/step indicated.
-2. **During the session:** When the student completes a phase, sub-phase, or makes significant progress — update `SESSION-PROGRESS.md` immediately. Don't wait until the end.
-3. **At the end of every session** (when the student says goodbye, switches PCs, or the conversation is ending): Update `SESSION-PROGRESS.md` with:
-   - Current phase and exact step
-   - Key lessons learned in this session
-   - Any corrections or "aha moments" the student had
-   - Updated student profile if new patterns emerged (learning style, pace, struggles)
-   - What's next (specific enough that the next session can resume without guessing)
-4. **Student profile section** is important — it captures HOW this student learns best, what confuses them, what teaching approaches work. Update it as you learn more about the student.
-5. **Never lose detail.** Each completed phase should have enough context that a new session can reference past decisions and explain WHY they were made if the student asks.
+## Session Rules
 
-## Domain Discovery
+1. Read `SESSION-PROGRESS.md` at start of each session to resume from exact phase/step
+2. Update `SESSION-PROGRESS.md` when student completes a phase or makes significant progress
+3. Student writes all code — mentor gives structure/hints, not implementations
+4. Always use production tools (PostgreSQL + Docker, not SQLite)
+5. Always write explicit access modifiers (public/private/protected), override, and return types
+6. Let the student explore questions at their own pace — don't rush to next task
 
-- **DOMAIN.md** — All project-specific decisions: ubiquitous language glossary, bounded contexts, aggregate mappings, invariants, domain events, database schema, and API design. This is the living document for the Event Ticketing platform. Everything we discover goes here.
+## Project Structure
 
-## Thinking Guides
-
-The `how-to-map-requirements/` folder contains reusable thinking guides that teach HOW to approach domain discovery for any system. These are learning artifacts — not project-specific docs.
-
-- **01-UBIQUITOUS-LANGUAGE-GUIDE.md** — How to discover business vocabulary: identifying roles (not "users"), replacing technical terms with business terms, naming actions with business verbs, and building a glossary.
-- **02-BOUNDED-CONTEXT-GUIDE.md** — How to find system boundaries: spotting the same word with different meanings, grouping by who cares and rate of change, defining communication through events, and identifying the core domain.
-- **03-AGGREGATE-MAPPING-GUIDE.md** — How to map aggregates: finding the root, identifying children and value objects, discovering invariants (using "Can it...?", "What if...?", "Who enforces this?" techniques), mapping state transitions, and finding domain events.
-- **04-DATABASE-DESIGN-GUIDE.md** — How to design the database schema from the domain model: identifying tables, defining columns (identity, FKs, state, data, timestamps), relationships, denormalization decisions, indexing strategy, and common mistakes (DECIMAL for money, never delete for state changes).
-- **05-API-DESIGN-GUIDE.md** — How to design REST APIs: listing user actions, choosing HTTP methods (POST for actions, PATCH for field updates), URL patterns (nouns not verbs), request bodies (minimum data), responses (full resource with human-readable data), status codes (400 vs 409), error format, and pagination.
-
-**Important:** When creating new guides for the student, always place them in this folder with a numbered prefix to indicate the chronological order of the steps. These guides must be system-agnostic — they teach the thinking process, not this specific project's answers.
-
-## Memories
-
-The `.claude-memories/` folder contains persistent memories that MUST be read at the start of every session. These travel with the repo via git.
-
-- **MEMORY.md** — Index of all memory files
-- **user_learning_profile.md** — How this student learns, preferences, session continuity needs
-- **feedback_production_grade.md** — Always use production tools, never toy setups
-- **feedback_technical_is_base.md** — TECHNICAL.md is a base, not law — apply real industry practices
-- **feedback_explicit_modifiers.md** — Always write public/private/protected, override, and return types explicitly
-- **project_avenir_refactor.md** — Student wants to refactor Avenir's mesa virtual module with DDD later
-- **feedback_dont_push.md** — Let the student explore questions at their own pace, don't rush to next task
-
-### Memory sync rules:
-1. **`.claude-memories/` is the source of truth** — it travels with the repo via git and works across different PCs.
-2. When creating or updating memories, **always write to `.claude-memories/` first**, then sync to `~/.claude/projects/.../memory/`.
-3. **At the start of every session:** Compare both MEMORY.md indexes. If `.claude-memories/` has memories that the local `~/.claude/projects/.../memory/` doesn't, copy them over. The project folder should always win since it's shared across PCs.
-4. Never rely solely on the local Claude memory — always keep `.claude-memories/` up to date as the primary store.
+```
+src/
+├── ordering/
+│   ├── domain/
+│   │   ├── model/          Order, OrderItem, Money, Quantity, OrderStatus
+│   │   ├── ports/          OrderRepository, PaymentGateway, EventAvailabilityChecker, IdGenerator, Clock
+│   │   ├── events/         OrderCreated, OrderPaid, OrderExpired, OrderCancelled
+│   │   └── errors/         8 domain errors with marker parent classes
+│   ├── application/        5 use cases
+│   └── infrastructure/
+│       ├── http/           OrderController, DTOs (request + response)
+│       └── out/            MikroOrmOrderRepository, OrderMapper, FakePaymentGateway, FakeEventAvailabilityChecker, CryptoIdGenerator, SystemClock
+├── shared/
+│   ├── domain/             Entity, AggregateRoot, ValueObject, DomainEvent, DomainError, marker errors
+│   └── infrastructure/     DomainExceptionFilter
+└── app.module.ts
+```

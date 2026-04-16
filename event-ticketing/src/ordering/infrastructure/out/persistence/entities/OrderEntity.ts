@@ -41,6 +41,9 @@ export class OrderEntity {
   @Property({ type: 'Date' })
   expires_at!: Date
 
+  @Property({ version: true, type: 'integer' })
+  version!: number
+
   @OneToMany(
     () => OrderItemEntity,
     (item) => item.order,

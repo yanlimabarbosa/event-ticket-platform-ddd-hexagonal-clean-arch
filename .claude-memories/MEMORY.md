@@ -7,3 +7,5 @@
 - [Let student code](feedback_let_student_code.md) — Give hints and structure, don't write full implementations
 - [Java migration](project_java_migration.md) — Student will migrate to Java + Spring after this project; prefer Java-transferable patterns
 - [Visual and incremental](feedback_visual_and_incremental.md) — ASCII diagrams for every pattern + always show flow → problem → pattern fix
+- [DTO security review](feedback_dto_security_review.md) — reject client-owned money/identity/auth fields in request DTOs; cross-check against DOMAIN.md
+- [Cross-context rules](project_cross_context_rules.md) — never import another context's entities; use public query services + domain events (full rules in TECHNICAL.md)

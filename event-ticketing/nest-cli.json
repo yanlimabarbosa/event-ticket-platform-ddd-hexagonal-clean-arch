@@ -8,10 +8,12 @@
       "name":"@nestjs/swagger",
       "options": {                                                                                                          
             "dtoFileNameSuffix": ["Dto.ts", ".dto.ts"],
-            "controllerFileNameSuffix": ["Controller.ts", ".controller.ts"],                                                    
-            "classValidatorShim": true,                          
-            "introspectComments": true                                                                                          
-          }   
+            "controllerFileNameSuffix": ["Controller.ts", ".controller.ts"],
+            "classValidatorShim": true,
+            "introspectComments": true,
+            "autoFillEnumName": true,
+            "parameterProperties": true
+          }
     }]
   }
 }

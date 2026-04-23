@@ -1,7 +1,7 @@
 export abstract class DomainEvent {
   readonly occurredOn: Date
 
-  constructor() {
+  public constructor() {
     this.occurredOn = new Date()
   }
 }

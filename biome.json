@@ -17,7 +17,11 @@
       "style": {
         "noNonNullAssertion": "warn",
         "useConst": "error",
-        "useImportType": "off"
+        "useImportType": "off",
+        "useConsistentMemberAccessibility": {
+          "level": "error",
+          "options": { "accessibility": "explicit" }
+        }
       },
       "suspicious": {
         "noExplicitAny": "warn"
@@ -39,7 +43,11 @@
     }
   },
   "files": {
-    "includes": ["event-ticketing/src/**", "event-ticketing/test/**", "!event-ticketing/src/migrations/**"],
+    "includes": [
+      "event-ticketing/src/**",
+      "event-ticketing/test/**",
+      "!event-ticketing/src/migrations"
+    ],
     "ignoreUnknown": true
   }
 }

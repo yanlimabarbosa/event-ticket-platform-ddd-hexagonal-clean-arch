@@ -430,6 +430,211 @@ export abstract class ValueObject {
 
 ---
 
+## CROSS-CONTEXT COMMUNICATION
+
+Bounded contexts are **modules with a public API and private internals**. Other contexts may only depend on the public surface.
+
+### What is public vs private per context
+
+```
+<context>/
+├── domain/                             # PRIVATE — module-internal only
+├── infrastructure/persistence/         # PRIVATE — entities, mappers, repos
+├── infrastructure/http/                # PRIVATE — controllers are transport, not API
+└── application/
+    ├── commands/                       # PRIVATE handlers
+    ├── queries/
+    │   └── <PublicQueryService>.ts     # PUBLIC — re-exported from module
+    └── event-handlers/                 # PRIVATE
+```
+
+Also public: the **domain events** the context publishes (as the integration contract).
+
+### Rules
+
+1. **Never import another context's entities, repositories, mappers, or domain model.** If you're writing `import { TicketTypeEntity } from '../event-management/...'` outside the `event-management/` module, stop — that's a boundary violation.
+2. **Cross-context reads go through a local projection by default, query service only as exception** (see "Choosing the read pattern" below). Example: Ordering subscribes to `TicketTypePriceChanged` and maintains `ticket_type_prices` projection in its own DB. Query services exposed by the upstream are used only for non-critical reads (admin, reports).
+3. **Cross-context writes go through domain events.** Context A publishes an event, Context B subscribes. A never calls B's command handler directly. (Anti-corruption layer optional, recommended when upstream vocabulary is foreign.)
+4. **Ordering's own adapter stays in Ordering.** The port (`TicketTypePricing`) lives in Ordering's `application/ports/out/`. The adapter (`EventMgmtTicketTypePricing`) lives in Ordering's `infrastructure/out/services/` and calls the upstream's query service. The port is Ordering's anti-corruption boundary — if Event Management's API changes, only the adapter changes, not the domain.
+5. **Shared data that exists in both contexts is not shared — it's duplicated on purpose.** Example: current ticket price (Event Management) vs. price-at-order-time (Ordering, `order_items.unit_price`). Same number at creation, different meanings, different ownership.
+
+### Enforcement
+
+Prefer tooling over review discipline. In `biome.json` or ESLint, forbid cross-context imports to private paths:
+
+```json
+"noRestrictedImports": {
+  "paths": [
+    { "name": "*/<other-context>/domain/*", "message": "Use the public query service" },
+    { "name": "*/<other-context>/infrastructure/*", "message": "Internal — do not import" }
+  ]
+}
+```
+
+Boundary violations become lint errors, not PR comments.
+
+### Choosing the read pattern — resilience decides
+
+Two options for any cross-context read. The choice is driven by one question: **if the upstream context fails, is the downstream user flow allowed to fail too?**
+
+| Pattern | Mechanism | Resilience | When to use |
+|---------|-----------|------------|-------------|
+| **Projection (default for hot paths)** | Downstream maintains its own read model, populated asynchronously from upstream domain events. Reads are 100% local. | Upstream can be down — downstream keeps serving with last-known-good data. Eventual consistency. | **Any read on a critical user flow** (creating orders, processing payments, serving real-time features). The resilience target. |
+| **Query Service (exception)** | Upstream exposes a public `*QueryService` class. Downstream adapter calls it (in-process in a monolith, HTTP/gRPC across services). | Downstream availability = `min(A, B)`. When upstream is down, downstream is effectively down. | Non-critical reads where upstream downtime failing the flow is acceptable: admin panels, internal dashboards, reports, config lookups, one-off migrations. |
+
+**Rule of thumb:**
+
+> If the failure of context B should not block context A's primary user flow, A must read from its own projection of B's data. Direct calls (query service, HTTP, gRPC) are only acceptable for flows where A being unavailable when B is unavailable is acceptable business behavior.
+
+**Why query services alone are not enough:**
+
+In a monolith, both contexts live in the same process — if one crashes or throws on startup, the whole app dies. In microservices, the network adds failure modes. Query services give you **boundary cleanliness** (the upstream's entities aren't leaked), but not **runtime independence**. Only projections give you both.
+
+**What a projection requires (prerequisites):**
+
+1. Upstream publishes reliable domain events (outbox pattern — phase 3.8)
+2. Downstream has an event handler that updates its own table idempotently
+3. Bootstrap / backfill strategy for when a new projection first comes online
+4. Ability to tolerate a small consistency gap (usually ms, sometimes seconds)
+
+If the upstream doesn't publish events, projections aren't on the table — the fix is at the upstream, not the downstream.
+
+**Evolution timeline for this project:**
+
+| Phase | Where | What happens |
+|-------|-------|-------------|
+| 3.8 | Ordering | Outbox pattern — Ordering reliably emits its domain events |
+| 4.4 | Event Management built | Emits `TicketTypePriceChanged`, `EventPublished`, `EventCancelled` via outbox |
+| 4.4b | Ordering | Subscribes to Event Management events, maintains `ticket_type_prices` projection in its own DB |
+| 4.4c | Ordering | `TicketTypePricing` adapter reads the projection. Price lookups never touch Event Management. |
+| 4.7 | Both | Swap EventEmitter2 → Kafka. No code change in use cases. |
+| 5.1 | Both | Extract to separate services. Projections already local → runtime independence free. |
+
+The port `TicketTypePricing` never changes. Only the adapter behind it evolves.
+
+**Mixed usage inside a single context is normal:** the same context may read some things via projection (hot path) and others via query service (admin). Decide per read, not per context.
+
+### Anti-patterns (do not do)
+
+- Ordering reading `TicketTypeEntity` directly via its own `EntityManager` (Shared Database / Big Ball of Mud).
+- Re-exporting another context's entity from a shared index file.
+- Synchronous pub/sub request-reply for ordinary reads ("ask the bus for a price"). Use direct call or local projection.
+- One shared MikroORM `entities/` folder for all contexts. Each context owns its entities.
+
+---
+
+## DISTRIBUTED SYSTEMS TRADE-OFFS — APPLIED TO TICKETING
+
+The generic framework (CAP, sync vs async, event notification vs state transfer, monolith + queue, etc.) is captured in `distributed-systems-tradeoffs.md` (external reference). This section nails down the **specific decisions for this domain** so the team doesn't re-litigate them every feature.
+
+### Guiding question for any cross-service interaction
+
+> If the other service is down right now, what should happen?
+
+- "The feature should fail" → synchronous call (Option A sync)
+- "The feature should work with slightly stale data" → local projection (Option B async, event-carried state transfer)
+- "The feature should queue the request for later" → async work queue / outbox
+
+### Guiding question for any work inside a request
+
+> Does the result of this operation change what I tell the user right now?
+
+- **Yes** → synchronous, on the request thread
+- **No** → enqueue (outbox → worker), return success to the user
+
+### Decisions — Ordering context
+
+| Read / action | Source / mechanism | Consistency | Rationale |
+|---|---|---|---|
+| Ticket **price** | Local projection (from `TicketTypePriceChanged`) | Eventual (ms–seconds) | Customer pays the price they saw. Stale is correct behavior, not a bug. |
+| Event metadata (name, date, venue) | Local projection (from `EventPublished`, `EventUpdated`) | Eventual | Rarely changes. Stale is harmless for display. |
+| Event "open for sales" status | Local projection (from `EventCancelled`, `SalesClosed`) | Eventual | A slipped-through order after cancellation is handled by compensating refund, not by blocking the read path. |
+| Ticket **inventory / reservation** | **Synchronous command on Event Management** (`reserveTickets`) with DB lock | Strong | Overselling is unacceptable — cannot refund a seat that doesn't exist. Accept availability coupling for correctness. This is the explicit exception. |
+| **Payment authorization** | Synchronous call to payment gateway | Strong | Cannot tell the user "paid" without confirmation. Webhook handles async state transitions post-auth. |
+| Order confirmation email | Outbox + worker | Eventual | Delay doesn't change user-visible truth. |
+| Check-in ticket issuance | Event-driven (`OrderPaid` → Check-in handler) | Eventual | The user got "paid" on a sync call; the ticket arrives shortly after. |
+| Analytics, aggregates, audit | Outbox + worker | Eventual | Zero impact on hot path. |
+
+### Event payload policy (this project)
+
+- **Events carry enough state to be useful without calling back** (event-carried state transfer, fat events). Thin "notification" events (id only) force the consumer into synchronous callbacks — the opposite of the resilience we want.
+- Keep payloads small enough to be cheap to store and broadcast. Never put arbitrary blobs or PII in events — use IDs + minimally needed fields.
+- Include `eventId`, `occurredOn`, `aggregateId`, and domain-relevant fields. Nothing else.
+
+### Critical-path synchronous work (this project)
+
+Keep these on the request thread:
+
+1. Input validation (format + domain preconditions + authorization)
+2. Read ticket price from local projection (fails if projection missing the type — not downtime related)
+3. `reserveTickets` on Event Management (strong consistency — sync is mandatory here)
+4. Create + persist Order (same DB transaction as outbox row)
+5. On pay: authorize payment with gateway (sync)
+6. On pay: flip Order status + write outbox event (same tx)
+
+Everything else queues.
+
+### Reservation + timeout (the mandatory pattern for this domain)
+
+Overselling is non-negotiable. The domain owns a compensating window:
+
+```
+ CreateOrder ──► reserve tickets (inventory -N, status=reserved, expires_at = now + 15min)
+                      │
+        ┌─────────────┼─────────────┐
+        ▼                           ▼
+ PayOrder (within 15min)     ExpireOrder cron (after 15min)
+ tickets stay reserved       release tickets (inventory +N, status=expired)
+ status=paid                 customer must start over
+```
+
+Invariant 5 (reservation expires in 15 minutes) is already in DOMAIN.md and implemented via `ExpireOrderUseCase`. This pattern is what lets Ordering avoid a full saga — the time-bounded reservation is itself the compensating transaction.
+
+### Why NOT event sourcing (yet)
+
+Domain events + outbox give audit trail and cross-context integration. Full event sourcing (events = source of truth, state recomputed by fold) is deferred to phase 6.5 because:
+
+- Current state-based model is simpler and sufficient for the aggregate size
+- Event sourcing adds schema-evolution cost (every old event must be replayable forever)
+- Query requirements are not yet read-model-heavy enough to justify projection overhead on the write side
+
+When to revisit: if regulatory audit requires exact temporal replay, or if read patterns diverge enough to justify CQRS-level separation.
+
+### Why NOT microservices (yet)
+
+Decoupling is an architecture property, not a deployment property. A modular monolith with:
+- Strict public/private module boundaries
+- Cross-context reads via local projections
+- Cross-context writes via domain events
+- Outbox for reliable publishing
+
+…already provides 80% of microservices' architectural benefits with none of the operational cost. Extraction happens at phase 5.1 only when named pain (independent scaling, team autonomy, compliance boundary) justifies the distributed systems tax.
+
+### The 6 reliability primitives that must be present before scaling
+
+Before adding a second context, make sure all six are in place in Ordering:
+
+1. **Outbox** — reliable event publishing
+2. **Idempotency keys** — safe retries (POST /orders, POST /orders/:id/pay)
+3. **Optimistic locking** — concurrent-write safety (`@Property({ version: true })`)
+4. **Local projection** — cross-context reads stay local (added when Event Management exists)
+5. **Inbox** — consumer-side dedup for at-least-once delivery (phase 4.8)
+6. **Reconciliation job** — periodic check against source of truth (phase 6.11)
+
+Missing any of these before splitting contexts = building a distributed monolith.
+
+### Meta-lessons encoded in this project
+
+- There is no best architecture — only trade-offs suited to context
+- Start simple, add complexity when real pain justifies it
+- Duplication isn't a bug — it's the cost of decoupling, storage is cheap
+- Eventual consistency is usually fine — except for money and safety (here: inventory)
+- Most microservice benefits are achievable with modular monolith + outbox + projections
+- Operational complexity compounds — every moving part can break
+- Design for change, not perfection
+
+---
+
 ## PATTERNS TO FOLLOW
 
 ### Ubiquitous Language

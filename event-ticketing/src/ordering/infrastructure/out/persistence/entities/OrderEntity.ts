@@ -12,41 +12,41 @@ export enum OrderStatusEnum {
 @Entity({ tableName: 'orders' })
 export class OrderEntity {
   @PrimaryKey({ type: 'string' })
-  id!: string
+  public id!: string
 
   @Property({ type: 'integer' })
-  total!: number
+  public total!: number
 
   @Property({ type: 'string' })
-  event_id!: string
+  public event_id!: string
 
   @Property({ type: 'string' })
-  attendee_id!: string
+  public attendee_id!: string
 
   @Enum(() => OrderStatusEnum)
-  status!: OrderStatusEnum
+  public status!: OrderStatusEnum
 
-  @Property({ type: 'Date' })
-  created_at!: Date
+  @Property({ type: 'timestamptz' })
+  public created_at!: Date
 
-  @Property({ type: 'Date', nullable: true })
-  paid_at!: Date | null
+  @Property({ type: 'timestamptz', nullable: true })
+  public paid_at!: Date | null
 
-  @Property({ type: 'Date', nullable: true })
-  cancelled_at!: Date | null
+  @Property({ type: 'timestamptz', nullable: true })
+  public cancelled_at!: Date | null
 
   @Property({ type: 'string', nullable: true })
-  cancel_reason!: string | null
+  public cancel_reason!: string | null
 
-  @Property({ type: 'Date' })
-  expires_at!: Date
+  @Property({ type: 'timestamptz' })
+  public expires_at!: Date
 
   @Property({ version: true, type: 'integer' })
-  version!: number
+  public version!: number
 
   @OneToMany(
     () => OrderItemEntity,
     (item) => item.order,
   )
-  items = new Collection<OrderItemEntity>(this)
+  public items = new Collection<OrderItemEntity>(this)
 }

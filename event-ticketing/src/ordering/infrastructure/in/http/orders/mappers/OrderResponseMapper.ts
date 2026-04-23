@@ -1,30 +1,27 @@
 import { Injectable } from '@nestjs/common'
 import type { Order } from '../../../../../domain/entities/Order'
-import { OrderItemResponseDto, OrderResponseDto } from '../responses/OrderResponseDto'
+import { OrderResponseDto } from '../responses/OrderResponseDto'
 
 @Injectable()
 export class OrderResponseMapper {
   public toResponse(order: Order): OrderResponseDto {
-    return new OrderResponseDto(
-      order.id,
-      order.getEventId(),
-      order.getAttendeeId(),
-      order.getStatus().getValue(),
-      order.getTotal().getValue(),
-      order.getItems().map(
-        (item) =>
-          new OrderItemResponseDto(
-            item.id,
-            item.getTicketTypeId(),
-            item.getQuantity().getValue(),
-            item.getUnitPrice().getValue(),
-          ),
-      ),
-      order.getCreatedAt().toISOString(),
-      order.getExpiresAt().toISOString(),
-      order.getPaidAt()?.toISOString() ?? null,
-      order.getCancelledAt()?.toISOString() ?? null,
-      order.getCancelReason(),
-    )
+    return {
+      id: order.id,
+      eventId: order.getEventId(),
+      attendeeId: order.getAttendeeId(),
+      status: order.getStatus().getValue(),
+      total: order.getTotal().getValue(),
+      items: order.getItems().map((item) => ({
+        id: item.id,
+        ticketTypeId: item.getTicketTypeId(),
+        quantity: item.getQuantity().getValue(),
+        unitPrice: item.getUnitPrice().getValue(),
+      })),
+      createdAt: order.getCreatedAt().toISOString(),
+      expiresAt: order.getExpiresAt().toISOString(),
+      paidAt: order.getPaidAt()?.toISOString() ?? null,
+      cancelledAt: order.getCancelledAt()?.toISOString() ?? null,
+      cancelReason: order.getCancelReason(),
+    }
   }
 }

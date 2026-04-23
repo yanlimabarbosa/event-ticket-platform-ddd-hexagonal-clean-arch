@@ -63,6 +63,7 @@ export class OrderMapper {
       paid_at: order.getPaidAt(),
       cancelled_at: order.getCancelledAt(),
       cancel_reason: order.getCancelReason(),
+      version: 1,
       items: order.getItems().map((item) => ({
         id: item.id,
         ticket_type_id: item.getTicketTypeId(),

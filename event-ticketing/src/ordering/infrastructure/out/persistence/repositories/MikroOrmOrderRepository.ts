@@ -1,7 +1,7 @@
-import { EntityManager } from '@mikro-orm/postgresql'
+import { EntityManager } from '@mikro-orm/core'
 import { Injectable } from '@nestjs/common'
-import type { Order } from '../../../../domain/entities/Order'
 import { OrderRepository } from '../../../../application/ports/out/OrderRepository'
+import type { Order } from '../../../../domain/entities/Order'
 import { OrderEntity } from '../entities/OrderEntity'
 import { OrderMapper } from '../mappers/OrderMapper'
 

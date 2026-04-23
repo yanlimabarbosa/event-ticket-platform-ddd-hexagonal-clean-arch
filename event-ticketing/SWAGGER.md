@@ -132,13 +132,22 @@ export class CreateOrderRequestDto {
 
 No `@ApiProperty({ description: '...' })` needed.
 
-### 8. Field declarations — constructor style or top-level, both work
+### 8. Always use plain field declarations with `!` — **never constructor parameter properties**
 
-The plugin handles both styles equivalently. Pick based on how the DTO is built.
+The plugin's AST visitor walks **class body field declarations** only. TypeScript constructor parameter properties (`public readonly id: string` inside `constructor(...)`) are a **different AST node** the visitor ignores → fields invisible → empty schema.
 
-**Constructor parameter properties** — preferred for response DTOs (built manually by a mapper):
+This applies to **every DTO**, request or response.
 
 ```ts
+// ✅ YES — plugin sees every field
+export class OrderResponseDto {
+  public readonly id!: string
+  public readonly total!: number
+  public readonly items!: OrderItemResponseDto[]
+  public readonly paidAt!: string | null
+}
+
+// ❌ NO — plugin emits `OrderResponseDto: {}` in OpenAPI
 export class OrderResponseDto {
   public constructor(
     public readonly id: string,
@@ -149,30 +158,33 @@ export class OrderResponseDto {
 }
 ```
 
-Benefits: no `!` assertions, compile error if mapper forgets a field, clear single construction path. `new OrderResponseDto(...)` forces all fields at the call site.
+**How to build instances without a positional constructor:**
 
-**Top-level field declarations with `!`** — required for request DTOs (populated by `class-transformer`'s `plainToClass`, which uses reflection and needs a no-arg constructor):
+Response DTOs are structurally typed — return a plain object literal from the mapper. TS checks it satisfies the class shape. No `new`, no `Object.assign`.
 
 ```ts
-export class CreateOrderRequestDto {
-  @IsUUID()
-  public readonly eventId!: string
-
-  @IsInt()
-  @Min(1)
-  public readonly quantity!: number
+// Mapper — zero boilerplate
+public toResponse(order: Order): OrderResponseDto {
+  return {
+    id: order.id,
+    total: order.getTotal().getValue(),
+    items: order.getItems().map((i) => ({ /* ... */ })),
+    paidAt: order.getPaidAt()?.toISOString() ?? null,
+  }
 }
 ```
 
-Swagger and class-validator read the same metadata regardless of style. **The choice is driven by how the instance is constructed, not by swagger.**
+Trade-off: the returned value is a plain object, not `instanceof OrderResponseDto`. Fine for response serialization (Nest just `JSON.stringify`s it). **Not** fine if you later enable `ClassSerializerInterceptor` with `@Exclude()`/`@Transform()` decorators — those need a real class instance. In that case, add a `constructor(input: T) { Object.assign(this, input) }` to the DTO and build via `new OrderResponseDto({ ... })`.
 
-| DTO kind      | Built by                          | Preferred style               |
-|---------------|-----------------------------------|-------------------------------|
-| Response      | Manual `new` in a mapper          | Constructor parameter props   |
-| Request       | `class-transformer` / NestJS pipe | Top-level fields with `!`     |
-| MikroORM entity | ORM via no-arg ctor + hydration | Top-level fields              |
+Request DTOs are built by `class-transformer`'s `plainToInstance` (called by `ValidationPipe`) — it needs a no-arg constructor anyway, so this style is already required.
 
-The controller's return type annotation (`Promise<OrderResponseDto>`) is what the plugin introspects for the response schema — either style produces the same schema.
+| DTO kind        | Build path                             | Style                       |
+|-----------------|----------------------------------------|-----------------------------|
+| Response        | Object literal returned by mapper      | Plain fields with `!`       |
+| Request         | `class-transformer` / `ValidationPipe` | Plain fields with `!`       |
+| MikroORM entity | ORM via no-arg ctor + hydration        | Plain fields                |
+
+**Never use constructor parameter properties in any DTO.** The plugin cannot see them.
 
 ---
 
@@ -258,7 +270,7 @@ Hot reload in some setups doesn't re-run the plugin — if schema looks stale af
 | Symptom                                    | Cause                                                                 | Fix              |
 |-------------------------------------------|----------------------------------------------------------------------|------------------|
 | Field appears as `{}` in request body     | Type is a string literal union, type alias, or `import type`         | Rules 2, 3, 4    |
-| Response body is empty / any              | Return type is an interface, or imported with `import type`          | Rules 1, 3       |
+| Response body is empty / any              | Return type is an interface, imported with `import type`, or DTO uses constructor parameter properties | Rules 1, 3, 8 |
 | Whole DTO missing from schema             | File doesn't match `dtoFileNameSuffix` in `nest-cli.json`             | Add suffix to config |
 | Field missing entirely                    | No class-validator decorator AND no explicit type                     | Rule 6           |
 | Required field shown as optional          | Missing `@IsNotEmpty()` or similar, or has `@IsOptional()`            | Rule 6           |
@@ -280,7 +292,7 @@ Hot reload in some setups doesn't re-run the plugin — if schema looks stale af
 - [ ] JSDoc `/** */` above each field (becomes description)
 - [ ] File name ends with `Dto.ts` or `.dto.ts`
 - [ ] Controller method has explicit `Promise<ResponseDto>` return type
-- [ ] Field style matches build path (constructor for mapper-built, top-level `!` for class-transformer-built)
+- [ ] All fields are plain top-level declarations with `!` — **no constructor parameter properties**
 - [ ] Zero `@Api*` decorators in the file
 
 If all 10 are true, swagger auto-generates the full schema. No manual decorators, ever.

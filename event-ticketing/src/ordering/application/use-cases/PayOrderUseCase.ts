@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common'
+import { Clock } from '../../../shared/application/ports/out/Clock'
+import { UnitOfWork } from '../../../shared/application/ports/out/UnitOfWork'
+import { Order } from '../../domain/entities/Order'
 import { OrderNotFound } from '../../domain/errors/OrderNotFound'
 import { PaymentFailed } from '../../domain/errors/PaymentFailed'
-import { Order } from '../../domain/entities/Order'
-import { Clock } from '../ports/out/Clock'
+import { DomainEventPublisher } from '../ports/out/DomainEventPublisher'
 import { OrderRepository } from '../ports/out/OrderRepository'
-import { PaymentGateway, type PaymentMethod } from '../ports/out/PaymentGateway'
+import { PaymentGateway, PaymentMethod } from '../ports/out/PaymentGateway'
 
 @Injectable()
 export class PayOrderUseCase {
@@ -12,6 +14,8 @@ export class PayOrderUseCase {
     private readonly orderRepository: OrderRepository,
     private readonly paymentGateway: PaymentGateway,
     private readonly clock: Clock,
+    private readonly domainEventPublisher: DomainEventPublisher,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
   public async execute(
@@ -38,7 +42,10 @@ export class PayOrderUseCase {
 
     order.pay(this.clock.now())
 
-    await this.orderRepository.save(order)
+    await this.unitOfWork.run(async () => {
+      await this.orderRepository.save(order)
+      await this.domainEventPublisher.publish(order.pullDomainEvents())
+    })
 
     return order
   }

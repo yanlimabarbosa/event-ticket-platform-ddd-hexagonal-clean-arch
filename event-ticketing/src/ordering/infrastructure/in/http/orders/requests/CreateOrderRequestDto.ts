@@ -17,10 +17,6 @@ export class CreateOrderItemDto {
   @IsInt()
   @Min(1)
   public readonly quantity!: number
-
-  @IsInt()
-  @Min(0)
-  public readonly unitPrice!: number
 }
 
 export class CreateOrderRequestDto {

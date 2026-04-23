@@ -1,13 +1,11 @@
-import { IsIn, IsNotEmpty, IsString } from 'class-validator'
-import type { PaymentMethod } from '../../../../../application/ports/out/PaymentGateway'
-
-const PAYMENT_METHODS: PaymentMethod[] = ['credit_card', 'pix', 'boleto']
+import { IsEnum, IsNotEmpty, IsString } from 'class-validator'
+import { PaymentMethod } from '../../../../../application/ports/out/PaymentGateway'
 
 export class PayOrderRequestDto {
   @IsString()
   @IsNotEmpty()
   public readonly paymentToken!: string
 
-  @IsIn(PAYMENT_METHODS)
+  @IsEnum(PaymentMethod)
   public readonly paymentMethod!: PaymentMethod
 }

@@ -7,7 +7,7 @@ import { OrderResponseMapper } from './mappers/OrderResponseMapper'
 import { CancelOrderRequestDto } from './requests/CancelOrderRequestDto'
 import { CreateOrderRequestDto } from './requests/CreateOrderRequestDto'
 import { PayOrderRequestDto } from './requests/PayOrderRequestDto'
-import type { OrderResponseDto } from './responses/OrderResponseDto'
+import { OrderResponseDto } from './responses/OrderResponseDto'
 
 @Controller('orders')
 export class OrdersController {
